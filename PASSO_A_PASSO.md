@@ -1,404 +1,1205 @@
-# Passo a passo de uma conversa
+# Passo a passo: cinco mensagens, do texto ao desenho
 
-Este documento acompanha uma conversa inteira, mensagem por mensagem, mostrando o que cada
-peça da aplicação fez. Os dados são de uma conversa real, feita em 10/10/2026 com o modelo
-`claude-haiku-5-5`: os pedidos de tool, os resultados e as respostas estão transcritos
-como aconteceram. A única parte montada à mão é a seção 9, sobre erros, e ela está
-marcada.
+Este documento acompanha uma conversa real de cinco mensagens e mostra, para cada uma:
+
+1. **o caminho da mensagem** dentro da aplicação, peça por peça;
+2. **o que foi enviado à LLM** e o que ela pediu de volta;
+3. **cada tool executada** e o resultado;
+4. **como o JSON do processo ficou**;
+5. **como o desenho ficou**;
+6. **o que a LLM passou a saber** para a mensagem seguinte.
+
+Tudo aqui foi gravado de uma conversa feita em 10/10/2026 com o modelo `claude-haiku-5-5`
+(sessão `e1232735`): pedidos de tool, resultados, JSON, imagens e respostas são os que
+aconteceram, sem edição. Inclusive um erro da LLM na mensagem 2, que ela mesma corrigiu.
+
+A conversa foi conduzida por um script que chama `Sessao.enviar()` diretamente. Os
+diagramas mostram a página web (`web.py`) como interface; pelo terminal (`terminal.py`) o
+caminho é idêntico, porque as duas interfaces só fazem chamar a `Sessao`.
 
 Uma LLM não responde sempre igual. Se você repetir a conversa, os nomes dos passos e a
-divisão em chamadas podem mudar. O que **não** muda é o caminho que cada mensagem percorre
-dentro da aplicação, e é isso que importa aqui.
+divisão em voltas podem mudar. O que **não** muda é o caminho que cada mensagem percorre,
+e é isso que importa aqui.
 
 Termos técnicos estão no [glossário](docs/glossario.md). A visão geral está em
 [docs/README.md](docs/README.md) e o detalhe de cada arquivo em [docs/pecas/](docs/pecas/).
 
-## Como ler
+---
 
-Cada mensagem do usuário abre um **turno**. Dentro do turno a aplicação dá uma ou mais
-**voltas** neste laço:
+## Antes de começar: o caminho que toda mensagem faz
+
+```mermaid
+flowchart TB
+    P(["Pessoa escreve"]) --> W["<b>visao/web.py</b><br/>recebe o texto"]
+    W --> S["<b>app/sessao.py</b> · Sessao.enviar()<br/>tira uma 'foto' do processo e roda o grafo"]
+    S --> A["<b>app/agente/grafo.py</b> · nó agente<br/>monta o pacote e chama a LLM"]
+    A --> L{{"LLM"}}
+    L --> Q{"pediu tools?"}
+    Q -- "sim" --> F["<b>app/agente/grafo.py</b> · nó ferramentas<br/>executa cada tool, na ordem"]
+    F --> T["<b>app/agente/ferramentas.py</b><br/>a tool repassa o pedido"]
+    T --> M["<b>app/dominio/modelo.py</b><br/>valida, guarda cópia, altera o processo"]
+    M --> D["<b>app/persistencia.py</b><br/>grava json, bpmn e md"]
+    D -- "nova volta:<br/>a LLM vê o resultado" --> A
+    Q -- "não: respondeu em texto" --> R["<b>Sessao</b> monta o RespostaTurno<br/>texto + ações + o que mudou"]
+    R --> V["<b>visao/web.py</b><br/>mostra a resposta e redesenha"]
+    V --> X["<b>exportar_bpmn.py + visualizador.py</b><br/>calculam posições e desenham"]
+```
+
+Cada passagem pelo trecho `nó agente → LLM → nó ferramentas` é uma **volta**. Um turno
+tem no mínimo uma volta (a LLM responde direto) e normalmente duas ou mais.
+
+### Quem envia para a LLM, e o que vai no pacote
+
+Só uma peça fala com a LLM: o **nó `agente`**, em `app/agente/grafo.py`. A cada volta ele
+monta um pacote com três partes e faz uma única chamada (`llm.invoke(...)`). A biblioteca
+LangChain transforma essa chamada em uma requisição pela internet para o provedor.
 
 ```mermaid
 flowchart LR
-    U(["mensagem<br/>do usuário"]) --> A["nó agente<br/>monta as instruções com o<br/>estado atual e chama a LLM"]
-    A --> Q{"a LLM pediu<br/>tools?"}
-    Q -- "sim" --> F["nó ferramentas<br/>executa cada tool na ordem<br/>e salva os arquivos"]
-    F -- "nova volta" --> A
-    Q -- "não" --> R(["resposta em texto<br/>para o usuário"])
+    subgraph pacote["O pacote enviado à LLM a cada volta"]
+        direction TB
+        I["<b>1. Instruções</b> (SYSTEM_PROMPT)<br/>quem ela é, como conversar, o roteiro,<br/>como usar as tools<br/><i>texto fixo, de prompt.py</i>"]
+        E["<b>2. Estado atual do processo</b><br/>o resumo com ids, conexões e pontos em aberto<br/><i>recalculado a cada volta por modelo.resumo()</i>"]
+        C["<b>3. A conversa</b><br/>falas, pedidos de tool e resultados<br/><i>os últimos 14 turnos</i>"]
+        K["<b>4. As 17 tools</b><br/>nome, descrição e parâmetros de cada uma<br/><i>de ferramentas.py</i>"]
+    end
+    pacote --> LLM{{"LLM"}}
+    LLM --> R1["texto<br/>(a resposta para a pessoa)"]
+    LLM --> R2["pedidos de tool<br/>(nome + argumentos)"]
 ```
 
-Quem é quem nas tabelas (caminhos a partir de `src/bpmn_agent/`):
+As partes 1 e 2 viajam juntas, como um texto só (as "instruções de sistema"). Na primeira
+chamada desta conversa esse texto tinha 4847 caracteres, e a parte 2 era apenas:
 
-| Nome | Arquivo | Papel |
-|---|---|---|
-| Interface | `visao/web.py` ou `visao/terminal.py` | Recebe o texto e mostra a resposta. |
-| `Sessao` | `app/sessao.py` | Dona da conversa; roda o turno. |
-| Nó `agente` | `app/agente/grafo.py` | Chama a LLM. |
-| Nó `ferramentas` | `app/agente/grafo.py` | Executa as tools pedidas. |
-| Tool | `app/agente/ferramentas.py` | Repassa o pedido ao modelo. |
-| Modelo | `app/dominio/modelo.py` | Altera o processo de verdade. |
-| Exportador | `app/exportacao/exportar_bpmn.py` | Gera o arquivo `.bpmn`. |
-| Visualizador | `visao/visualizador.py` | Gera a página que desenha. |
-| Persistência | `app/persistencia.py` | Grava os arquivos em disco. |
+```text
+Processo: Novo processo
+Diagrama vazio.
+```
 
----
+A LLM **não executa nada**. Ela devolve texto, ou devolve pedidos do tipo "chame
+`adicionar_elemento` com estes argumentos". Quem executa é o nó `ferramentas`.
 
-## 0. Antes da primeira mensagem
+### Como ler cada mensagem abaixo
 
-O usuário abre a página web. Nenhuma LLM é chamada ainda.
+- **Diagrama de sequência**: leia de cima para baixo. Cada seta é uma chamada entre duas
+  peças. As faixas "volta 1", "volta 2" marcam cada ida à LLM.
+- **Tabela de tools**: ✅ deu certo, ❌ o modelo recusou.
+- **Bloco `diff` do JSON**: `+` é o que entrou, `-` o que saiu, `~` o que foi alterado.
+- **Imagem**: o desenho como a pessoa vê. O que mudou no turno aparece com contorno verde.
 
-| # | Quem | O que faz |
-|---|---|---|
-| 1 | Interface | Lê o `.env` e chama `criar_llm()`. |
-| 2 | `llm.py` | Vê `LLM_PROVEDOR=anthropic`, pega o modelo padrão e a chave, devolve um `ChatAnthropic`. |
-| 3 | Interface | Cria `Sessao(llm)`. |
-| 4 | `Sessao` | Sorteia um id (`1da7e80f`), cria um `ModeloProcesso` vazio e chama `construir_grafo`. |
-| 5 | `construir_grafo` | Chama `criar_ferramentas(sessao)`, entrega as 17 tools à LLM (`bind_tools`) e monta o grafo de dois nós. |
-| 6 | `Sessao` | Grava a `SAUDACAO` como primeira mensagem da conversa. |
-| 7 | Interface | Mostra a saudação. |
+### O ponto de partida
 
-> **Agente:** Oi! 👋 Vou te ajudar a desenhar um processo de trabalho, passo a passo. [...]
+A pessoa abre a página web. Nenhuma LLM é chamada: `web.py` lê o `.env`, `llm.py` cria a
+conexão com o provedor, e `Sessao` nasce com um processo vazio e a saudação (texto fixo de
+`prompt.py`) como primeira mensagem.
+
+> Oi! 👋 Vou te ajudar a desenhar um processo de trabalho, passo a passo. [...]
 > Pra começar: **qual processo você quer documentar?**
 
-A saudação é um texto fixo de `prompt.py`. Processo neste momento: vazio.
+O `processo.json` neste momento:
+
+```json
+{"nome": "Novo processo", "descricao": "", "participantes": [], "elementos": {}, "fluxos": [], "pendencias": [], "contadores": {}}
+```
 
 ---
 
-## 1. "reembolso de despesas de viagem"
+## Mensagem 1: "reembolso de despesas de viagem"
+
+A pessoa só disse o assunto. A LLM registra o nome e o objetivo, e pergunta por onde o processo começa.
+
+| Chamadas à LLM | Tools executadas | Tools com erro | Elementos | Conexões | Participantes | Regras |
+|---|---|---|---|---|---|---|
+| 2 | 1 | 0 | 0 | 0 | 0 | 0 |
 
 ### O caminho da mensagem
 
-| # | Quem | O que faz |
-|---|---|---|
-| 1 | Interface | Chama `sessao.enviar("reembolso de despesas de viagem")`. |
-| 2 | `Sessao.enviar` | Guarda uma "foto" dos elementos e conexões (para saber depois o que mudou) e inicia o grafo. |
-| 3 | Nó `agente` | Pede `modelo.resumo()`. Recebe `Processo: Novo processo / Diagrama vazio.` e encaixa no `SYSTEM_PROMPT`. |
-| 4 | Nó `agente` | A conversa começa com a saudação (fala do agente), então coloca `"(início da conversa)"` na frente. Envia tudo à LLM. |
-
-### Volta 1: a LLM pede uma tool
-
-A LLM não escreve texto. Pede:
-
-```text
-definir_processo(nome="Reembolso de despesas de viagem",
-                 descricao="Devolver ao colaborador os gastos feitos em viagem a trabalho.")
-```
-
-| # | Quem | O que faz |
-|---|---|---|
-| 5 | `rotear` | Vê que há pedido de tool e manda para o nó `ferramentas`. |
-| 6 | Nó `ferramentas` | Acha a tool `definir_processo` e a executa. |
-| 7 | Tool `definir_processo` | Chama `modelo.definir_processo(nome, descricao)`. |
-| 8 | Modelo | Tira a cópia para o desfazer, grava nome e descrição, devolve `Processo agora se chama 'Reembolso de despesas de viagem'.` |
-| 9 | Nó `ferramentas` | Embrulha o texto em uma `ToolMessage` e chama `sessao.salvar()`. |
-| 10 | `Sessao.salvar` | Chama `persistencia.salvar_artefatos`, que grava `processo.json`, `processo.bpmn` (via exportador) e `processo.md` em `sessoes/1da7e80f/`. |
-
-### Volta 2: a LLM responde
-
-O nó `agente` roda de novo. O resumo agora já traz o nome novo. A LLM vê o resultado da
-tool e responde só com texto; `rotear` encerra o turno.
-
-> **Agente:** Ótimo, anotei: **reembolso de despesas de viagem**, para devolver ao
-> colaborador os gastos que ele teve em uma viagem a trabalho.
->
-> Para começar o desenho: **o que dá início a esse processo?** Por exemplo, o colaborador
-> envia uma solicitação, ele volta da viagem e entrega as notas, ou alguma outra coisa?
-
-### O que volta para a interface
-
-| Campo de `RespostaTurno` | Valor |
-|---|---|
-| `texto` | A fala acima. |
-| `acoes` | `definir_processo: Processo agora se chama '...'.` |
-| `alterados` | vazio (nenhum elemento ou conexão mudou; nada a destacar) |
-
-**Resumo do turno:** 2 chamadas à LLM, 1 tool, 1 cópia para o desfazer.
-
----
-
-## 2. "o funcionário preenche um formulário e anexa as notas"
-
-### Volta 1: dois pedidos na mesma resposta
-
-```text
-adicionar_elemento(tipo="inicio", nome="Formulário de reembolso enviado")
-adicionar_elemento(tipo="tarefa_pessoa", nome="Preencher formulário e anexar notas",
-                   responsavel="Funcionário", depois_de="Formulário de reembolso enviado")
-```
-
-O nó `ferramentas` executa **na ordem**:
-
-| Tool | O que o modelo fez | Resultado |
-|---|---|---|
-| 1ª `adicionar_elemento` | Não há `depois_de`. Cria o elemento solto, com o id `Inicio_1`. | `Criado Inicio_1 'Formulário de reembolso enviado'.` |
-| 2ª `adicionar_elemento` | `resolver()` procura "Formulário de reembolso enviado": não é um id, mas é o nome exato de `Inicio_1`. O responsável "Funcionário" não existia e é cadastrado como participante. Cria `Passo_1` e a conexão `Fluxo_1` (`Inicio_1 ➜ Passo_1`). | `Criado Passo_1 '...' depois de Inicio_1.` |
-
-Dois detalhes que este turno mostra:
-
-- **A ordem importa.** Se as tools rodassem ao mesmo tempo, a segunda poderia não achar o
-  início que a primeira ainda estava criando.
-- **A LLM usou o nome em vez do id.** Ela pediu as duas tools de uma vez, então ainda não
-  sabia que o início se chamaria `Inicio_1`. O `resolver()` aceita nomes exatamente para
-  casos assim.
-
-### Volta 2: resposta
-
-> **Agente:** Entendi: o funcionário preenche o formulário e anexa as notas. E depois que
-> ele envia, **o que acontece?** Quem recebe esse formulário e o que faz com ele?
-
-### Estado depois do turno
-
 ```mermaid
-flowchart LR
-    I(("Formulário de<br/>reembolso enviado")) --> P1["Preencher formulário<br/>e anexar notas<br/><i>Funcionário</i>"]
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant W as web.py
+    participant S as Sessao
+    participant A as Nó agente
+    participant L as LLM (Claude)
+    participant F as Nó ferramentas
+    participant M as ModeloProcesso
+    participant D as persistencia.py
+    P->>W: "reembolso de despesas de viagem"
+    W->>S: enviar(texto)
+    S->>A: roda o grafo
+    Note over A,L: volta 1
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 3 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: definir_processo(nome=Reembolso de despesas d…)
+    M-->>F: Processo agora se chama 'Reembolso de despesas …
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 2
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 5 mensagens + 17 tools
+    L-->>A: só texto (a resposta)
+    A-->>S: fim do grafo
+    S-->>W: RespostaTurno
+    W-->>P: resposta + desenho atualizado
 ```
 
-| | |
-|---|---|
-| `alterados` | `Inicio_1`, `Passo_1`, `Fluxo_1` (os três aparecem em verde no desenho) |
-| Pontos em aberto (`modelo.problemas()`) | "Ainda não sabemos como o processo termina (nenhum fim)." e "Passo_1 '...': não sabemos o que acontece depois." |
+### As tools, uma a uma
 
-Os pontos em aberto entram no resumo que a LLM recebe na próxima chamada. É assim que ela
-sabe que deve perguntar "o que acontece depois?".
-
-O início não tem responsável, mas não é cobrado por isso. No desenho, ele aparece na raia
-do Funcionário, porque `modelo.raia_de("Inicio_1")` herda a raia do passo seguinte.
-
-**Resumo do turno:** 2 chamadas à LLM, 2 tools, 2 cópias para o desfazer.
-
----
-
-## 3. "aí o gestor dele analisa. se aprovar vai pro financeiro pagar, se não aprovar o funcionário é avisado e acabou"
-
-O usuário deu muita informação de uma vez. A LLM dividiu o trabalho em quatro voltas com
-tools e só então respondeu. Em cada volta ela recebeu o resumo atualizado, com os ids
-recém-criados.
-
-| Volta | Pedido da LLM | O que o modelo fez | Resultado |
-|---|---|---|---|
-| 1 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Analisar pedido de reembolso", responsavel="Gestor do funcionário", depois_de="Passo_1")` | `Passo_1` é um passo comum sem saída: liga `Passo_1 ➜ Passo_2`. Cadastra o participante "Gestor do funcionário". | `Criado Passo_2 '...' depois de Passo_1.` |
-| 2 | `adicionar_elemento(tipo="decisao", nome="Pedido aprovado pelo gestor?", depois_de="Passo_2")` | Liga `Passo_2 ➜ Decisao_1`. Sem responsável. | `Criado Decisao_1 '...' depois de Passo_2.` |
-| 3 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Pagar reembolso", responsavel="Financeiro", depois_de="Decisao_1", rotulo_conexao="Sim")` | O anterior é uma decisão: cria um **novo caminho** `Decisao_1 ➜ Passo_3` com o rótulo "Sim". | `Criado Passo_3 '...' depois de Decisao_1.` |
-| 3 | `adicionar_elemento(tipo="envio", nome="Avisar funcionário da recusa", responsavel="Gestor do funcionário", depois_de="Decisao_1", rotulo_conexao="Não")` | Outro novo caminho: `Decisao_1 ➜ Passo_4` com o rótulo "Não". | `Criado Passo_4 '...' depois de Decisao_1.` |
-| 4 | `adicionar_elemento(tipo="fim", nome="Pedido recusado", depois_de="Passo_4")` | Liga `Passo_4 ➜ Fim_1`. | `Criado Fim_1 '...' depois de Passo_4.` |
-| 5 | (só texto) | | |
-
-O ponto central deste turno é o comportamento de `depois_de`:
-
-- depois de um **passo comum**, o novo elemento entra **em seguida** dele;
-- depois de uma **decisão**, cada novo elemento abre **um caminho novo**, e o
-  `rotulo_conexao` vira a resposta escrita na seta.
-
-Ao fim de cada volta com tools, o nó `ferramentas` chamou `sessao.salvar()`: os arquivos
-foram regravados quatro vezes neste turno.
-
-> **Agente:** Entendi: o gestor analisa o pedido. Se aprovar, vai para o financeiro pagar.
-> Se não aprovar, o funcionário é avisado e o processo termina. Já desenhei isso.
->
-> Agora, **depois que o financeiro paga o reembolso, o que acontece?** O processo termina
-> ali ou existe mais algum passo?
-
-### Estado depois do turno
-
-```mermaid
-flowchart LR
-    I(("Formulário<br/>enviado")) --> P1["Preencher formulário<br/><i>Funcionário</i>"]
-    P1 --> P2["Analisar pedido<br/><i>Gestor</i>"]
-    P2 --> D1{"Pedido aprovado<br/>pelo gestor?"}
-    D1 -- "Sim" --> P3["Pagar reembolso<br/><i>Financeiro</i>"]
-    D1 -- "Não" --> P4["Avisar funcionário<br/>da recusa<br/><i>Gestor</i>"]
-    P4 --> F1(("Pedido<br/>recusado"))
-```
-
-| | |
-|---|---|
-| `alterados` | `Passo_2`, `Decisao_1`, `Passo_3`, `Passo_4`, `Fim_1`, `Fluxo_2` a `Fluxo_6` |
-| Pontos em aberto | "Passo_3 'Pagar reembolso': não sabemos o que acontece depois." |
-
-A pergunta que o agente fez ("depois que o financeiro paga, o que acontece?") corresponde
-exatamente ao único ponto em aberto.
-
-**Resumo do turno:** 5 chamadas à LLM, 5 tools, 5 cópias para o desfazer.
-
----
-
-## 4. "depois que o financeiro paga acabou. o pagamento tem que sair em até 5 dias úteis"
-
-### Volta 1
-
-```text
-adicionar_elemento(tipo="fim", nome="Reembolso pago", depois_de="Passo_3")
-adicionar_regra(id="Passo_3", regra="O pagamento deve ser feito em até 5 dias úteis.")
-```
-
-| Tool | O que o modelo fez | Resultado |
+| Volta | Pedido da LLM | Resultado devolvido à LLM |
 |---|---|---|
-| `adicionar_elemento` | Liga `Passo_3 ➜ Fim_2` (`Fluxo_7`). | `Criado Fim_2 'Reembolso pago' depois de Passo_3.` |
-| `adicionar_regra` | Acrescenta o texto à lista `regras` de `Passo_3`. | `Regra registrada em Passo_3 (agora são 1).` |
+| 1 | `definir_processo(nome="Reembolso de despesas de viagem", descricao="Devolver ao funcionário os gastos feitos em viagem a trabalho.")` | ✅ `Processo agora se chama 'Reembolso de despesas de viagem'.` |
+| 2 | (nenhum: respondeu em texto) | |
 
-A regra não muda o desenho, mas vai para três lugares: o resumo que a LLM lê, a descrição
-em texto (`processo.md`) e o campo de documentação do passo dentro do `.bpmn`.
+A tool `definir_processo` repassou o pedido a `ModeloProcesso.definir_processo`, que guardou uma cópia para o desfazer e gravou o nome e a descrição. A descrição não foi dita pela pessoa com essas palavras: a LLM a redigiu a partir do assunto.
 
-### Volta 2
+Na volta 2, a LLM recebeu o mesmo pacote, agora com o resultado da tool na conversa e o nome novo no estado, e respondeu só com texto. O turno acabou.
 
-> **Agente:** Pronto, coloquei o prazo de **até 5 dias úteis** no pagamento, e o fim
-> "Reembolso pago" depois dele.
->
-> Agora uma dúvida sobre o gestor: **se ele achar que falta uma nota ou que algo está
-> errado no pedido, o que acontece?** Ele recusa direto ou devolve para o funcionário
-> ajustar e reenviar?
+### Como o JSON ficou
 
-| | |
-|---|---|
-| `alterados` | `Passo_3` (ganhou uma regra), `Fim_2`, `Fluxo_7` |
-| Pontos em aberto | nenhum |
+O que mudou em `processo.json` neste turno (`+` entrou, `-` saiu, `~` foi alterado):
 
-Sem pontos em aberto, a LLM passou para a etapa 6 do roteiro em `prompt.py`: perguntar
-sobre exceções e retrabalho.
-
-**Resumo do turno:** 2 chamadas à LLM, 2 tools, 2 cópias para o desfazer.
-
----
-
-## 5. "esqueci: antes de pagar o financeiro confere as notas"
-
-O usuário ignora a pergunta e pede uma **inserção no meio** do que já existe. É o tipo de
-pedido de alteração que a aplicação precisa atender a qualquer momento.
-
-Não existe uma operação "inserir antes de". A LLM resolveu com três operações, em duas
-voltas:
-
-| Volta | Pedido da LLM | O que o modelo fez | Resultado |
-|---|---|---|---|
-| 1 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Conferir notas", responsavel="Financeiro", depois_de="Decisao_1", rotulo_conexao="Sim")` | Novo caminho `Decisao_1 ➜ Passo_5` com rótulo "Sim". Por um instante a decisão tem **dois** caminhos "Sim". | `Criado Passo_5 'Conferir notas' depois de Decisao_1.` |
-| 2 | `desconectar(origem="Decisao_1", destino="Passo_3")` | Remove o "Sim" antigo, que ia direto para o pagamento. | `Conexão Decisao_1 -> Passo_3 removida.` |
-| 2 | `conectar(origem="Passo_5", destino="Passo_3")` | Cria `Passo_5 ➜ Passo_3` (`Fluxo_9`). | `Conectado Passo_5 -> Passo_3.` |
-| 3 | (só texto) | | |
-
-```mermaid
-flowchart LR
-    subgraph antes["Antes"]
-        direction LR
-        D1a{"Aprovado?"} -- "Sim" --> P3a["Pagar reembolso"]
-    end
-    subgraph depois["Depois"]
-        direction LR
-        D1b{"Aprovado?"} -- "Sim" --> P5["Conferir notas"] --> P3b["Pagar reembolso"]
-    end
+```diff
++ "nome": "Reembolso de despesas de viagem"
++ "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho."
 ```
 
-Depois da volta 1 o processo estava em um estado intermediário esquisito, e isso é
-aceitável: o modelo garante que cada operação é válida, não que cada estado intermediário
-faz sentido. O que conta é o estado ao fim do turno, e a lista de pontos em aberto mostra
-se sobrou algo.
+<details>
+<summary>Ver o <code>processo.json</code> completo depois desta mensagem</summary>
 
-> **Agente:** Pronto, coloquei **Conferir notas** (também pelo financeiro) logo antes do
-> pagamento.
->
-> Voltando à dúvida de antes: **se o gestor achar que falta uma nota ou que algo está
-> errado no pedido, o que acontece?** [...]
-
-O agente retomou a pergunta que ficou sem resposta. Ele consegue porque a pergunta está no
-histórico da conversa, que o nó `agente` reenvia a cada chamada.
-
-| | |
-|---|---|
-| `alterados` | `Passo_5`, `Fluxo_8`, `Fluxo_9` |
-| Pontos em aberto | nenhum |
-
-**Resumo do turno:** 3 chamadas à LLM, 3 tools, 3 cópias para o desfazer.
-
----
-
-## 6. "na verdade quem avisa o funcionário da recusa é o RH"
-
-### Volta 1
-
-```text
-atualizar_elemento(id="Passo_4", responsavel="RH")
+```json
+{
+  "nome": "Reembolso de despesas de viagem",
+  "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho.",
+  "participantes": [],
+  "elementos": {},
+  "fluxos": [],
+  "pendencias": [],
+  "contadores": {}
+}
 ```
 
-| # | Quem | O que faz |
-|---|---|---|
-| 1 | Modelo | `resolver("Passo_4")` acha o elemento pelo id. |
-| 2 | Modelo | Tira a cópia para o desfazer. |
-| 3 | Modelo | "RH" não existe como participante: é cadastrado. O `responsavel` de `Passo_4` muda. Nome, tipo e descrição vieram vazios e ficam como estavam. |
-| 4 | Modelo | Devolve `Passo_4 atualizado (responsável).` |
+</details>
 
-No desenho, isso cria uma raia nova ("RH") e move o passo para ela. Nada disso foi pedido
-pela LLM: é consequência do cálculo de layout, que o exportador refaz do zero a cada
-salvamento.
+Só os dois campos de texto mudaram. Ainda não há elementos, conexões nem participantes.
 
-A LLM descobriu que "o aviso da recusa" era `Passo_4` lendo o resumo, que lista cada
-elemento com id, nome e responsável.
+### Como o desenho ficou
 
-### Volta 2
+Ainda não há desenho: o processo tem nome, mas nenhum elemento. A página web mostra o aviso "O desenho vai aparecer aqui conforme você conta como o processo funciona".
 
-> **Agente:** Pronto, quem avisa o funcionário da recusa agora é o RH. [...]
+### O que a LLM passa a saber
 
-| | |
-|---|---|
-| `alterados` | `Passo_4` |
-
-**Resumo do turno:** 2 chamadas à LLM, 1 tool, 1 cópia para o desfazer.
-
----
-
-## 7. "desfaz essa última mudança"
-
-### Volta 1
-
-```text
-desfazer()
-```
-
-| # | Quem | O que faz |
-|---|---|---|
-| 1 | Tool `desfazer` | Chama `modelo.desfazer()`. |
-| 2 | Modelo | Tira a última cópia da pilha `_historico` e a coloca no lugar do processo atual. Devolve `Última alteração desfeita.` |
-
-A cópia restaurada é a que foi tirada no passo 2 do turno anterior, **antes** de o "RH"
-ser cadastrado. Por isso o desfazer reverteu as duas coisas: o responsável do passo e a
-existência do participante.
-
-### Volta 2
-
-> **Agente:** Feito, voltei o aviso da recusa para o **gestor do funcionário**. [...]
-
-A resposta da tool dizia só "Última alteração desfeita". A LLM soube dizer o que voltou
-porque, na volta 2, o resumo já mostrava `Passo_4` com o responsável antigo.
-
-| | |
-|---|---|
-| `alterados` | `Passo_4` (comparado com a "foto" do início do turno, o responsável mudou) |
-
-**Atenção:** o desfazer volta **uma operação**. Aqui coincidiu com o turno inteiro porque
-o turno 6 teve uma operação só. Para desfazer o turno 5 (três operações), seriam
-necessários três desfazeres.
-
-**Resumo do turno:** 2 chamadas à LLM, 1 tool, nenhuma cópia nova (o desfazer consome uma).
-
----
-
-## 8. Como ficou
-
-O resumo do modelo ao fim da conversa, exatamente como a LLM o recebe:
+Este é o bloco "estado atual" que o nó `agente` vai colar nas instruções na **próxima** chamada:
 
 ```text
 Processo: Reembolso de despesas de viagem
-Descrição: Devolver ao colaborador os gastos feitos em viagem a trabalho.
-Participantes: Funcionário, Gestor do funcionário, Financeiro
+Descrição: Devolver ao funcionário os gastos feitos em viagem a trabalho.
+Diagrama vazio.
+```
+
+A última linha, "Diagrama vazio", é o que leva a LLM a perguntar pelo começo do processo, como manda o roteiro em `prompt.py`.
+
+### A resposta que a pessoa vê
+
+> Anotado: reembolso de despesas de viagem, para devolver ao funcionário o que ele gastou em viagem a trabalho. 👍
+>
+> Pra começar o desenho: **o que dá início a esse processo?** Por exemplo, o funcionário envia os comprovantes, ou ele preenche um formulário depois de voltar da viagem?
+
+---
+
+## Mensagem 2: "o funcionário preenche um formulário e anexa as notas"
+
+Aqui a LLM **errou na primeira tentativa** e se corrigiu sozinha. A pessoa não viu nada disso: para ela, veio só a resposta final.
+
+| Chamadas à LLM | Tools executadas | Tools com erro | Elementos | Conexões | Participantes | Regras |
+|---|---|---|---|---|---|---|
+| 4 | 4 | 2 | 2 | 1 | 1 | 0 |
+
+### O caminho da mensagem
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant W as web.py
+    participant S as Sessao
+    participant A as Nó agente
+    participant L as LLM (Claude)
+    participant F as Nó ferramentas
+    participant M as ModeloProcesso
+    participant D as persistencia.py
+    P->>W: "o funcionário preenche um formulário e anexa as notas"
+    W->>S: enviar(texto)
+    S->>A: roda o grafo
+    Note over A,L: volta 1
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 7 mensagens + 17 tools
+    L-->>A: pede 2 tools
+    A->>F: pedidos
+    F->>M: atualizar_elemento(Inicio_1, nome=Funcionário envia formu…)
+    M--xF: ErroModelo
+    F->>M: adicionar_elemento(tarefa_pessoa, nome=Preencher formulário de…, depois_de=Inicio_1)
+    M--xF: ErroModelo
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 2
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 10 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_elemento(inicio, nome=Funcionário envia formu…)
+    M-->>F: Criado Inicio_1 'Funcionário envia formulário c…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 3
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 12 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_elemento(tarefa_pessoa, nome=Preencher formulário de…, depois_de=Inicio_1)
+    M-->>F: Criado Passo_1 'Preencher formulário de reembol…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 4
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 14 mensagens + 17 tools
+    L-->>A: só texto (a resposta)
+    A-->>S: fim do grafo
+    S-->>W: RespostaTurno
+    W-->>P: resposta + desenho atualizado
+```
+
+### As tools, uma a uma
+
+| Volta | Pedido da LLM | Resultado devolvido à LLM |
+|---|---|---|
+| 1 | `atualizar_elemento(id="Inicio_1", nome="Funcionário envia formulário com notas")` | ❌ `ERRO: Não encontrei nenhum elemento 'Inicio_1'. Consulte os ids no estado atual.` |
+| 1 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Preencher formulário de reembolso", responsavel="Funcionário", depois_de="Inicio_1")` | ❌ `ERRO: Não encontrei nenhum elemento 'Inicio_1'. Consulte os ids no estado atual.` |
+| 2 | `adicionar_elemento(tipo="inicio", nome="Funcionário envia formulário com notas")` | ✅ `Criado Inicio_1 'Funcionário envia formulário com notas'.` |
+| 3 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Preencher formulário de reembolso", responsavel="Funcionário", depois_de="Inicio_1")` | ✅ `Criado Passo_1 'Preencher formulário de reembolso' depois de Inicio_1.` |
+| 4 | (nenhum: respondeu em texto) | |
+
+O que aconteceu, volta a volta:
+
+- **Volta 1.** A LLM supôs que já existia um início chamado `Inicio_1` e pediu para renomeá-lo e para criar um passo depois dele. Não existia. Nas duas tools, `ModeloProcesso.resolver()` não achou o elemento e lançou `ErroModelo`. O nó `ferramentas` capturou os erros e os devolveu como texto, com o prefixo `ERRO:`. **Nada foi alterado**: a validação acontece antes de o modelo mexer em qualquer coisa.
+- **Volta 2.** A LLM leu os dois erros e mudou de plano: criou o início explicitamente.
+- **Volta 3.** Com `Inicio_1` existindo de verdade, repetiu o pedido do passo, que agora deu certo. O responsável "Funcionário" não estava cadastrado; o modelo o cadastrou como participante na mesma operação.
+- **Volta 4.** Respondeu em texto.
+
+A mensagem de erro foi escrita para a LLM ("Consulte os ids no estado atual"), e funcionou: ela não precisou perguntar nada à pessoa. Com a depuração ligada, as duas linhas de `ERRO` aparecem na lista de ações do turno.
+
+### Como o JSON ficou
+
+O que mudou em `processo.json` neste turno (`+` entrou, `-` saiu, `~` foi alterado):
+
+```diff
++ participantes: "Funcionário"
++ elementos["Inicio_1"]: {"id": "Inicio_1", "tipo": "startEvent", "nome": "Funcionário envia formulário com notas"}
++ elementos["Passo_1"]: {"id": "Passo_1", "tipo": "userTask", "nome": "Preencher formulário de reembolso", "responsavel": "Funcionário"}
++ fluxos: {"id": "Fluxo_1", "origem": "Inicio_1", "destino": "Passo_1"}
+~ contadores: {"Inicio": 1, "Passo": 1, "Fluxo": 1}
+```
+
+<details>
+<summary>Ver o <code>processo.json</code> completo depois desta mensagem</summary>
+
+```json
+{
+  "nome": "Reembolso de despesas de viagem",
+  "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho.",
+  "participantes": [
+    "Funcionário"
+  ],
+  "elementos": {
+    "Inicio_1": {
+      "id": "Inicio_1",
+      "tipo": "startEvent",
+      "nome": "Funcionário envia formulário com notas",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_1": {
+      "id": "Passo_1",
+      "tipo": "userTask",
+      "nome": "Preencher formulário de reembolso",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    }
+  },
+  "fluxos": [
+    {
+      "id": "Fluxo_1",
+      "origem": "Inicio_1",
+      "destino": "Passo_1",
+      "rotulo": ""
+    }
+  ],
+  "pendencias": [],
+  "contadores": {
+    "Inicio": 1,
+    "Passo": 1,
+    "Fluxo": 1
+  }
+}
+```
+
+</details>
+
+Entraram o primeiro participante, os dois primeiros elementos e a primeira conexão. Repare em três coisas:
+
+- o início **não tem** `responsavel` no JSON (campo vazio, omitido acima);
+- `contadores` guarda o último número usado em cada tipo de id, para nunca repetir;
+- as duas tools que falharam não deixaram rastro nenhum.
+
+### Como o desenho ficou
+
+![Diagrama depois da mensagem 2](docs/imagens/turno_2.png)
+
+O exportador criou uma raia para o único participante. O início foi desenhado dentro da raia do Funcionário mesmo sem ter responsável: `modelo.raia_de()` faz início, fim e decisão herdarem a raia do passo vizinho. Isso é calculado na hora de desenhar e não fica gravado no JSON.
+
+### O que a LLM passa a saber
+
+Este é o bloco "estado atual" que o nó `agente` vai colar nas instruções na **próxima** chamada:
+
+```text
+Processo: Reembolso de despesas de viagem
+Descrição: Devolver ao funcionário os gastos feitos em viagem a trabalho.
+Participantes: Funcionário
 Elementos:
-- Inicio_1 [inicio] 'Formulário de reembolso enviado'
-- Passo_1 [tarefa_pessoa] 'Preencher formulário e anexar notas' | quem: Funcionário
-- Passo_2 [tarefa_pessoa] 'Analisar pedido de reembolso' | quem: Gestor do funcionário
+- Inicio_1 [inicio] 'Funcionário envia formulário com notas'
+- Passo_1 [tarefa_pessoa] 'Preencher formulário de reembolso' | quem: Funcionário
+Conexões:
+- Inicio_1 -> Passo_1
+Pontos em aberto no diagrama:
+- Ainda não sabemos como o processo termina (nenhum fim).
+- Passo_1 'Preencher formulário de reembolso': não sabemos o que acontece depois.
+```
+
+Apareceu a seção "Pontos em aberto", calculada por `analise.problemas()`. É ela que diz à LLM o que perguntar: o passo não tem continuação e o processo não tem fim. A pergunta que o agente fez em seguida ("depois que ele envia, o que acontece?") responde exatamente a isso.
+
+### A resposta que a pessoa vê
+
+> Entendi: o funcionário preenche o formulário e anexa as notas. Desenhei isso como o primeiro passo do processo.
+>
+> Depois que ele envia, **o que acontece?** Quem confere esse pedido, e como costuma ser: um gestor aprova, o financeiro confere, ou outra pessoa?
+
+---
+
+## Mensagem 3: "aí o gestor dele analisa. se aprovar vai pro financeiro pagar, se não aprovar o funcionário é avisado e acabou"
+
+A pessoa deu muita informação de uma vez: um passo, uma decisão, dois caminhos e um final. A LLM dividiu o trabalho em quatro voltas com tools antes de responder.
+
+| Chamadas à LLM | Tools executadas | Tools com erro | Elementos | Conexões | Participantes | Regras |
+|---|---|---|---|---|---|---|
+| 5 | 6 | 0 | 8 | 7 | 3 | 0 |
+
+### O caminho da mensagem
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant W as web.py
+    participant S as Sessao
+    participant A as Nó agente
+    participant L as LLM (Claude)
+    participant F as Nó ferramentas
+    participant M as ModeloProcesso
+    participant D as persistencia.py
+    P->>W: "aí o gestor dele analisa. se aprovar vai pro financeiro pag…"
+    W->>S: enviar(texto)
+    S->>A: roda o grafo
+    Note over A,L: volta 1
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 16 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_elemento(tarefa_pessoa, nome=Analisar pedido de reem…, depois_de=Passo_1)
+    M-->>F: Criado Passo_2 'Analisar pedido de reembolso' d…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 2
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 18 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_elemento(decisao, nome=Pedido aprovado pelo ge…, depois_de=Passo_2)
+    M-->>F: Criado Decisao_1 'Pedido aprovado pelo gestor?'…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 3
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 20 mensagens + 17 tools
+    L-->>A: pede 2 tools
+    A->>F: pedidos
+    F->>M: adicionar_elemento(tarefa_pessoa, nome=Pagar reembolso, depois_de=Decisao_1)
+    M-->>F: Criado Passo_3 'Pagar reembolso' depois de Deci…
+    F->>M: adicionar_elemento(envio, nome=Avisar funcionário da r…, depois_de=Decisao_1)
+    M-->>F: Criado Passo_4 'Avisar funcionário da recusa' d…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 4
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 23 mensagens + 17 tools
+    L-->>A: pede 2 tools
+    A->>F: pedidos
+    F->>M: adicionar_elemento(fim, nome=Pedido recusado e funci…, depois_de=Passo_4)
+    M-->>F: Criado Fim_1 'Pedido recusado e funcionário avi…
+    F->>M: adicionar_elemento(fim, nome=Reembolso pago, depois_de=Passo_3)
+    M-->>F: Criado Fim_2 'Reembolso pago' depois de Passo_3.
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 5
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 26 mensagens + 17 tools
+    L-->>A: só texto (a resposta)
+    A-->>S: fim do grafo
+    S-->>W: RespostaTurno
+    W-->>P: resposta + desenho atualizado
+```
+
+### As tools, uma a uma
+
+| Volta | Pedido da LLM | Resultado devolvido à LLM |
+|---|---|---|
+| 1 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Analisar pedido de reembolso", responsavel="Gestor", depois_de="Passo_1")` | ✅ `Criado Passo_2 'Analisar pedido de reembolso' depois de Passo_1.` |
+| 2 | `adicionar_elemento(tipo="decisao", nome="Pedido aprovado pelo gestor?", depois_de="Passo_2")` | ✅ `Criado Decisao_1 'Pedido aprovado pelo gestor?' depois de Passo_2.` |
+| 3 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Pagar reembolso", responsavel="Financeiro", depois_de="Decisao_1", rotulo_conexao="Sim")` | ✅ `Criado Passo_3 'Pagar reembolso' depois de Decisao_1.` |
+| 3 | `adicionar_elemento(tipo="envio", nome="Avisar funcionário da recusa", responsavel="Gestor", depois_de="Decisao_1", rotulo_conexao="Não")` | ✅ `Criado Passo_4 'Avisar funcionário da recusa' depois de Decisao_1.` |
+| 4 | `adicionar_elemento(tipo="fim", nome="Pedido recusado e funcionário avisado", depois_de="Passo_4")` | ✅ `Criado Fim_1 'Pedido recusado e funcionário avisado' depois de Passo_4.` |
+| 4 | `adicionar_elemento(tipo="fim", nome="Reembolso pago", depois_de="Passo_3")` | ✅ `Criado Fim_2 'Reembolso pago' depois de Passo_3.` |
+| 5 | (nenhum: respondeu em texto) | |
+
+O parâmetro `depois_de` muda de comportamento conforme o que vem antes, e este turno mostra os dois casos:
+
+- **depois de um passo comum** (voltas 1 e 2): o novo elemento entra em seguida dele;
+- **depois de uma decisão** (volta 3): cada novo elemento abre **um caminho novo**, e `rotulo_conexao` vira a resposta escrita na seta ("Sim", "Não").
+
+Na volta 3 a LLM pediu duas tools de uma vez. O nó `ferramentas` as executou uma depois da outra, na ordem recebida. A cada volta a LLM recebeu o estado atualizado, com os ids recém-criados, e por isso pôde usar `Decisao_1`, `Passo_3` e `Passo_4` nas voltas seguintes.
+
+A decisão e os dois finais foram criados sem `responsavel`, como as instruções orientam: não são trabalho de ninguém.
+
+### Como o JSON ficou
+
+O que mudou em `processo.json` neste turno (`+` entrou, `-` saiu, `~` foi alterado):
+
+```diff
++ participantes: "Gestor"
++ participantes: "Financeiro"
++ elementos["Passo_2"]: {"id": "Passo_2", "tipo": "userTask", "nome": "Analisar pedido de reembolso", "responsavel": "Gestor"}
++ elementos["Decisao_1"]: {"id": "Decisao_1", "tipo": "exclusiveGateway", "nome": "Pedido aprovado pelo gestor?"}
++ elementos["Passo_3"]: {"id": "Passo_3", "tipo": "userTask", "nome": "Pagar reembolso", "responsavel": "Financeiro"}
++ elementos["Passo_4"]: {"id": "Passo_4", "tipo": "sendTask", "nome": "Avisar funcionário da recusa", "responsavel": "Gestor"}
++ elementos["Fim_1"]: {"id": "Fim_1", "tipo": "endEvent", "nome": "Pedido recusado e funcionário avisado"}
++ elementos["Fim_2"]: {"id": "Fim_2", "tipo": "endEvent", "nome": "Reembolso pago"}
++ fluxos: {"id": "Fluxo_2", "origem": "Passo_1", "destino": "Passo_2"}
++ fluxos: {"id": "Fluxo_3", "origem": "Passo_2", "destino": "Decisao_1"}
++ fluxos: {"id": "Fluxo_4", "origem": "Decisao_1", "destino": "Passo_3", "rotulo": "Sim"}
++ fluxos: {"id": "Fluxo_5", "origem": "Decisao_1", "destino": "Passo_4", "rotulo": "Não"}
++ fluxos: {"id": "Fluxo_6", "origem": "Passo_4", "destino": "Fim_1"}
++ fluxos: {"id": "Fluxo_7", "origem": "Passo_3", "destino": "Fim_2"}
+~ contadores: {"Inicio": 1, "Passo": 4, "Fluxo": 7, "Decisao": 1, "Fim": 2}
+```
+
+<details>
+<summary>Ver o <code>processo.json</code> completo depois desta mensagem</summary>
+
+```json
+{
+  "nome": "Reembolso de despesas de viagem",
+  "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho.",
+  "participantes": [
+    "Funcionário",
+    "Gestor",
+    "Financeiro"
+  ],
+  "elementos": {
+    "Inicio_1": {
+      "id": "Inicio_1",
+      "tipo": "startEvent",
+      "nome": "Funcionário envia formulário com notas",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_1": {
+      "id": "Passo_1",
+      "tipo": "userTask",
+      "nome": "Preencher formulário de reembolso",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_2": {
+      "id": "Passo_2",
+      "tipo": "userTask",
+      "nome": "Analisar pedido de reembolso",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Decisao_1": {
+      "id": "Decisao_1",
+      "tipo": "exclusiveGateway",
+      "nome": "Pedido aprovado pelo gestor?",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_3": {
+      "id": "Passo_3",
+      "tipo": "userTask",
+      "nome": "Pagar reembolso",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_4": {
+      "id": "Passo_4",
+      "tipo": "sendTask",
+      "nome": "Avisar funcionário da recusa",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_1": {
+      "id": "Fim_1",
+      "tipo": "endEvent",
+      "nome": "Pedido recusado e funcionário avisado",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_2": {
+      "id": "Fim_2",
+      "tipo": "endEvent",
+      "nome": "Reembolso pago",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    }
+  },
+  "fluxos": [
+    {
+      "id": "Fluxo_1",
+      "origem": "Inicio_1",
+      "destino": "Passo_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_2",
+      "origem": "Passo_1",
+      "destino": "Passo_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_3",
+      "origem": "Passo_2",
+      "destino": "Decisao_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_4",
+      "origem": "Decisao_1",
+      "destino": "Passo_3",
+      "rotulo": "Sim"
+    },
+    {
+      "id": "Fluxo_5",
+      "origem": "Decisao_1",
+      "destino": "Passo_4",
+      "rotulo": "Não"
+    },
+    {
+      "id": "Fluxo_6",
+      "origem": "Passo_4",
+      "destino": "Fim_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_7",
+      "origem": "Passo_3",
+      "destino": "Fim_2",
+      "rotulo": ""
+    }
+  ],
+  "pendencias": [],
+  "contadores": {
+    "Inicio": 1,
+    "Passo": 4,
+    "Fluxo": 7,
+    "Decisao": 1,
+    "Fim": 2
+  }
+}
+```
+
+</details>
+
+Dois participantes novos (cadastrados sozinhos, pelo campo `responsavel`), seis elementos e seis conexões. As duas conexões que saem de `Decisao_1` são as únicas com `rotulo`.
+
+### Como o desenho ficou
+
+![Diagrama depois da mensagem 3](docs/imagens/turno_3.png)
+
+Agora há três raias, na ordem em que os participantes foram cadastrados. A decisão ficou na raia do Gestor e cada final na raia do passo que leva até ele, tudo por herança. As colunas seguem a ordem do fluxo: cada elemento fica à direita de tudo o que leva até ele.
+
+### O que a LLM passa a saber
+
+Este é o bloco "estado atual" que o nó `agente` vai colar nas instruções na **próxima** chamada:
+
+```text
+Processo: Reembolso de despesas de viagem
+Descrição: Devolver ao funcionário os gastos feitos em viagem a trabalho.
+Participantes: Funcionário, Gestor, Financeiro
+Elementos:
+- Inicio_1 [inicio] 'Funcionário envia formulário com notas'
+- Passo_1 [tarefa_pessoa] 'Preencher formulário de reembolso' | quem: Funcionário
+- Passo_2 [tarefa_pessoa] 'Analisar pedido de reembolso' | quem: Gestor
 - Decisao_1 [decisao] 'Pedido aprovado pelo gestor?'
 - Passo_3 [tarefa_pessoa] 'Pagar reembolso' | quem: Financeiro
-    regra 1: O pagamento deve ser feito em até 5 dias úteis.
-- Passo_4 [envio] 'Avisar funcionário da recusa' | quem: Gestor do funcionário
-- Fim_1 [fim] 'Pedido recusado'
+- Passo_4 [envio] 'Avisar funcionário da recusa' | quem: Gestor
+- Fim_1 [fim] 'Pedido recusado e funcionário avisado'
 - Fim_2 [fim] 'Reembolso pago'
-- Passo_5 [tarefa_pessoa] 'Conferir notas' | quem: Financeiro
+Conexões:
+- Inicio_1 -> Passo_1
+- Passo_1 -> Passo_2
+- Passo_2 -> Decisao_1
+- Decisao_1 -> Passo_3 [Sim]
+- Decisao_1 -> Passo_4 [Não]
+- Passo_4 -> Fim_1
+- Passo_3 -> Fim_2
+```
+
+Não há mais "Pontos em aberto": todo caminho chega a um fim e a decisão tem as duas respostas. Sem nada pendente no desenho, a LLM passou para a etapa do roteiro que procura exceções e perguntou sobre a recusa.
+
+### A resposta que a pessoa vê
+
+> Entendi: o gestor analisa o pedido. Se aprovar, o financeiro paga o reembolso. Se recusar, o funcionário é avisado e o processo termina. Já desenhei esse caminho.
+>
+> Uma dúvida: **quando o gestor recusa, o funcionário só é avisado, ou ele pode corrigir o pedido e enviar de novo?** Por exemplo, se faltou uma nota.
+
+---
+
+## Mensagem 4: "depois que o financeiro paga acabou. o pagamento tem que sair em até 5 dias úteis"
+
+A pessoa não respondeu à pergunta do agente: confirmou o final e acrescentou um prazo. A LLM viu no estado que o final "Reembolso pago" já existia e registrou só o que era novo.
+
+| Chamadas à LLM | Tools executadas | Tools com erro | Elementos | Conexões | Participantes | Regras |
+|---|---|---|---|---|---|---|
+| 2 | 1 | 0 | 8 | 7 | 3 | 1 |
+
+### O caminho da mensagem
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant W as web.py
+    participant S as Sessao
+    participant A as Nó agente
+    participant L as LLM (Claude)
+    participant F as Nó ferramentas
+    participant M as ModeloProcesso
+    participant D as persistencia.py
+    P->>W: "depois que o financeiro paga acabou. o pagamento tem que sa…"
+    W->>S: enviar(texto)
+    S->>A: roda o grafo
+    Note over A,L: volta 1
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 28 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_regra(Passo_3, regra=O pagamento deve sair e…)
+    M-->>F: Regra registrada em Passo_3 (agora são 1).
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 2
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 30 mensagens + 17 tools
+    L-->>A: só texto (a resposta)
+    A-->>S: fim do grafo
+    S-->>W: RespostaTurno
+    W-->>P: resposta + desenho atualizado
+```
+
+### As tools, uma a uma
+
+| Volta | Pedido da LLM | Resultado devolvido à LLM |
+|---|---|---|
+| 1 | `adicionar_regra(id="Passo_3", regra="O pagamento deve sair em até 5 dias úteis.")` | ✅ `Regra registrada em Passo_3 (agora são 1).` |
+| 2 | (nenhum: respondeu em texto) | |
+
+Uma única tool. `adicionar_regra` acrescentou o texto à lista `regras` do passo `Passo_3`. A LLM soube que "o pagamento" era `Passo_3` lendo o estado, que lista cada elemento com id, nome e responsável.
+
+### Como o JSON ficou
+
+O que mudou em `processo.json` neste turno (`+` entrou, `-` saiu, `~` foi alterado):
+
+```diff
+~ elementos["Passo_3"]: {"regras": ["O pagamento deve sair em até 5 dias úteis."]}
+```
+
+<details>
+<summary>Ver o <code>processo.json</code> completo depois desta mensagem</summary>
+
+```json
+{
+  "nome": "Reembolso de despesas de viagem",
+  "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho.",
+  "participantes": [
+    "Funcionário",
+    "Gestor",
+    "Financeiro"
+  ],
+  "elementos": {
+    "Inicio_1": {
+      "id": "Inicio_1",
+      "tipo": "startEvent",
+      "nome": "Funcionário envia formulário com notas",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_1": {
+      "id": "Passo_1",
+      "tipo": "userTask",
+      "nome": "Preencher formulário de reembolso",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_2": {
+      "id": "Passo_2",
+      "tipo": "userTask",
+      "nome": "Analisar pedido de reembolso",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Decisao_1": {
+      "id": "Decisao_1",
+      "tipo": "exclusiveGateway",
+      "nome": "Pedido aprovado pelo gestor?",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_3": {
+      "id": "Passo_3",
+      "tipo": "userTask",
+      "nome": "Pagar reembolso",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": [
+        "O pagamento deve sair em até 5 dias úteis."
+      ]
+    },
+    "Passo_4": {
+      "id": "Passo_4",
+      "tipo": "sendTask",
+      "nome": "Avisar funcionário da recusa",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_1": {
+      "id": "Fim_1",
+      "tipo": "endEvent",
+      "nome": "Pedido recusado e funcionário avisado",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_2": {
+      "id": "Fim_2",
+      "tipo": "endEvent",
+      "nome": "Reembolso pago",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    }
+  },
+  "fluxos": [
+    {
+      "id": "Fluxo_1",
+      "origem": "Inicio_1",
+      "destino": "Passo_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_2",
+      "origem": "Passo_1",
+      "destino": "Passo_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_3",
+      "origem": "Passo_2",
+      "destino": "Decisao_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_4",
+      "origem": "Decisao_1",
+      "destino": "Passo_3",
+      "rotulo": "Sim"
+    },
+    {
+      "id": "Fluxo_5",
+      "origem": "Decisao_1",
+      "destino": "Passo_4",
+      "rotulo": "Não"
+    },
+    {
+      "id": "Fluxo_6",
+      "origem": "Passo_4",
+      "destino": "Fim_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_7",
+      "origem": "Passo_3",
+      "destino": "Fim_2",
+      "rotulo": ""
+    }
+  ],
+  "pendencias": [],
+  "contadores": {
+    "Inicio": 1,
+    "Passo": 4,
+    "Fluxo": 7,
+    "Decisao": 1,
+    "Fim": 2
+  }
+}
+```
+
+</details>
+
+A única mudança em todo o JSON é a lista `regras` de um elemento.
+
+### Como o desenho ficou
+
+![Diagrama depois da mensagem 4](docs/imagens/turno_4.png)
+
+O desenho é o mesmo do turno anterior: uma regra não cria símbolo nenhum. O contorno verde em "Pagar reembolso" indica que o passo foi alterado. A regra vai para três lugares: o estado que a LLM lê (abaixo), a descrição em texto (`processo.md`) e o campo de documentação do passo dentro do `.bpmn`.
+
+### O que a LLM passa a saber
+
+Este é o bloco "estado atual" que o nó `agente` vai colar nas instruções na **próxima** chamada:
+
+```text
+Processo: Reembolso de despesas de viagem
+Descrição: Devolver ao funcionário os gastos feitos em viagem a trabalho.
+Participantes: Funcionário, Gestor, Financeiro
+Elementos:
+- Inicio_1 [inicio] 'Funcionário envia formulário com notas'
+- Passo_1 [tarefa_pessoa] 'Preencher formulário de reembolso' | quem: Funcionário
+- Passo_2 [tarefa_pessoa] 'Analisar pedido de reembolso' | quem: Gestor
+- Decisao_1 [decisao] 'Pedido aprovado pelo gestor?'
+- Passo_3 [tarefa_pessoa] 'Pagar reembolso' | quem: Financeiro
+    regra 1: O pagamento deve sair em até 5 dias úteis.
+- Passo_4 [envio] 'Avisar funcionário da recusa' | quem: Gestor
+- Fim_1 [fim] 'Pedido recusado e funcionário avisado'
+- Fim_2 [fim] 'Reembolso pago'
+Conexões:
+- Inicio_1 -> Passo_1
+- Passo_1 -> Passo_2
+- Passo_2 -> Decisao_1
+- Decisao_1 -> Passo_3 [Sim]
+- Decisao_1 -> Passo_4 [Não]
+- Passo_4 -> Fim_1
+- Passo_3 -> Fim_2
+```
+
+A regra aparece logo abaixo do passo. Na resposta, o agente **voltou à pergunta que tinha ficado sem resposta**. Ele consegue porque a pergunta está na conversa, que o nó `agente` reenvia a cada volta.
+
+### A resposta que a pessoa vê
+
+> Anotado: o pagamento tem que sair em até 5 dias úteis, e depois dele o processo termina.
+>
+> Voltando à recusa que ficou em aberto: **quando o gestor recusa, o funcionário só é avisado ou ele pode corrigir o pedido e enviar de novo?**
+
+---
+
+## Mensagem 5: "esqueci: antes de pagar o financeiro confere as notas"
+
+Um pedido de alteração: inserir um passo **no meio** do que já existe. Não há uma operação "inserir antes de"; a LLM resolveu combinando três operações simples.
+
+| Chamadas à LLM | Tools executadas | Tools com erro | Elementos | Conexões | Participantes | Regras |
+|---|---|---|---|---|---|---|
+| 3 | 3 | 0 | 9 | 8 | 3 | 1 |
+
+### O caminho da mensagem
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Pessoa
+    participant W as web.py
+    participant S as Sessao
+    participant A as Nó agente
+    participant L as LLM (Claude)
+    participant F as Nó ferramentas
+    participant M as ModeloProcesso
+    participant D as persistencia.py
+    P->>W: "esqueci: antes de pagar o financeiro confere as notas"
+    W->>S: enviar(texto)
+    S->>A: roda o grafo
+    Note over A,L: volta 1
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 32 mensagens + 17 tools
+    L-->>A: pede 1 tool
+    A->>F: pedidos
+    F->>M: adicionar_elemento(tarefa_pessoa, nome=Conferir notas do reemb…, depois_de=Decisao_1)
+    M-->>F: Criado Passo_5 'Conferir notas do reembolso' de…
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 2
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 34 mensagens + 17 tools
+    L-->>A: pede 2 tools
+    A->>F: pedidos
+    F->>M: desconectar(Decisao_1, Passo_3)
+    M-->>F: Conexão Decisao_1 -> Passo_3 removida.
+    F->>M: conectar(Passo_5, Passo_3)
+    M-->>F: Conectado Passo_5 -> Passo_3.
+    F->>D: salvar_artefatos()
+    F-->>A: resultados
+    Note over A,L: volta 3
+    A->>M: resumo()
+    M-->>A: estado atual
+    A->>L: instruções + estado + 37 mensagens + 17 tools
+    L-->>A: só texto (a resposta)
+    A-->>S: fim do grafo
+    S-->>W: RespostaTurno
+    W-->>P: resposta + desenho atualizado
+```
+
+### As tools, uma a uma
+
+| Volta | Pedido da LLM | Resultado devolvido à LLM |
+|---|---|---|
+| 1 | `adicionar_elemento(tipo="tarefa_pessoa", nome="Conferir notas do reembolso", responsavel="Financeiro", depois_de="Decisao_1", rotulo_conexao="Sim")` | ✅ `Criado Passo_5 'Conferir notas do reembolso' depois de Decisao_1.` |
+| 2 | `desconectar(origem="Decisao_1", destino="Passo_3")` | ✅ `Conexão Decisao_1 -> Passo_3 removida.` |
+| 2 | `conectar(origem="Passo_5", destino="Passo_3")` | ✅ `Conectado Passo_5 -> Passo_3.` |
+| 3 | (nenhum: respondeu em texto) | |
+
+- **Volta 1.** Criou "Conferir notas" como um novo caminho "Sim" saindo da decisão. Por um instante a decisão ficou com **dois** caminhos "Sim": um para o pagamento, outro para a conferência.
+- **Volta 2.** Removeu o "Sim" antigo (`desconectar`) e ligou a conferência ao pagamento (`conectar`).
+
+O estado depois da volta 1 não fazia sentido como processo, e isso é aceitável: o modelo garante que cada operação é válida, não que cada estado intermediário é coerente. O que conta é o estado ao fim do turno.
+
+### Como o JSON ficou
+
+O que mudou em `processo.json` neste turno (`+` entrou, `-` saiu, `~` foi alterado):
+
+```diff
++ elementos["Passo_5"]: {"id": "Passo_5", "tipo": "userTask", "nome": "Conferir notas do reembolso", "responsavel": "Financeiro"}
+- fluxos: {"id": "Fluxo_4", "origem": "Decisao_1", "destino": "Passo_3", "rotulo": "Sim"}
++ fluxos: {"id": "Fluxo_8", "origem": "Decisao_1", "destino": "Passo_5", "rotulo": "Sim"}
++ fluxos: {"id": "Fluxo_9", "origem": "Passo_5", "destino": "Passo_3"}
+~ contadores: {"Inicio": 1, "Passo": 5, "Fluxo": 9, "Decisao": 1, "Fim": 2}
+```
+
+<details>
+<summary>Ver o <code>processo.json</code> completo depois desta mensagem</summary>
+
+```json
+{
+  "nome": "Reembolso de despesas de viagem",
+  "descricao": "Devolver ao funcionário os gastos feitos em viagem a trabalho.",
+  "participantes": [
+    "Funcionário",
+    "Gestor",
+    "Financeiro"
+  ],
+  "elementos": {
+    "Inicio_1": {
+      "id": "Inicio_1",
+      "tipo": "startEvent",
+      "nome": "Funcionário envia formulário com notas",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_1": {
+      "id": "Passo_1",
+      "tipo": "userTask",
+      "nome": "Preencher formulário de reembolso",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_2": {
+      "id": "Passo_2",
+      "tipo": "userTask",
+      "nome": "Analisar pedido de reembolso",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Decisao_1": {
+      "id": "Decisao_1",
+      "tipo": "exclusiveGateway",
+      "nome": "Pedido aprovado pelo gestor?",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_3": {
+      "id": "Passo_3",
+      "tipo": "userTask",
+      "nome": "Pagar reembolso",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": [
+        "O pagamento deve sair em até 5 dias úteis."
+      ]
+    },
+    "Passo_4": {
+      "id": "Passo_4",
+      "tipo": "sendTask",
+      "nome": "Avisar funcionário da recusa",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_1": {
+      "id": "Fim_1",
+      "tipo": "endEvent",
+      "nome": "Pedido recusado e funcionário avisado",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_2": {
+      "id": "Fim_2",
+      "tipo": "endEvent",
+      "nome": "Reembolso pago",
+      "responsavel": "",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_5": {
+      "id": "Passo_5",
+      "tipo": "userTask",
+      "nome": "Conferir notas do reembolso",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    }
+  },
+  "fluxos": [
+    {
+      "id": "Fluxo_1",
+      "origem": "Inicio_1",
+      "destino": "Passo_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_2",
+      "origem": "Passo_1",
+      "destino": "Passo_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_3",
+      "origem": "Passo_2",
+      "destino": "Decisao_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_5",
+      "origem": "Decisao_1",
+      "destino": "Passo_4",
+      "rotulo": "Não"
+    },
+    {
+      "id": "Fluxo_6",
+      "origem": "Passo_4",
+      "destino": "Fim_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_7",
+      "origem": "Passo_3",
+      "destino": "Fim_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_8",
+      "origem": "Decisao_1",
+      "destino": "Passo_5",
+      "rotulo": "Sim"
+    },
+    {
+      "id": "Fluxo_9",
+      "origem": "Passo_5",
+      "destino": "Passo_3",
+      "rotulo": ""
+    }
+  ],
+  "pendencias": [],
+  "contadores": {
+    "Inicio": 1,
+    "Passo": 5,
+    "Fluxo": 9,
+    "Decisao": 1,
+    "Fim": 2
+  }
+}
+```
+
+</details>
+
+Saiu a conexão `Fluxo_4` (decisão ➜ pagamento) e entraram `Fluxo_8` (decisão ➜ conferência) e `Fluxo_9` (conferência ➜ pagamento). O número 4 não será reaproveitado: `contadores` só cresce.
+
+### Como o desenho ficou
+
+![Diagrama depois da mensagem 5](docs/imagens/turno_5.png)
+
+"Pagar reembolso" e o final "Reembolso pago" foram empurrados uma coluna para a direita, abrindo espaço para o passo novo. Ninguém pediu isso: o exportador recalcula todas as posições do zero a cada vez, a partir do JSON. Mudou o processo, o desenho se rearruma.
+
+### O que a LLM passa a saber
+
+Este é o bloco "estado atual" que o nó `agente` vai colar nas instruções na **próxima** chamada:
+
+```text
+Processo: Reembolso de despesas de viagem
+Descrição: Devolver ao funcionário os gastos feitos em viagem a trabalho.
+Participantes: Funcionário, Gestor, Financeiro
+Elementos:
+- Inicio_1 [inicio] 'Funcionário envia formulário com notas'
+- Passo_1 [tarefa_pessoa] 'Preencher formulário de reembolso' | quem: Funcionário
+- Passo_2 [tarefa_pessoa] 'Analisar pedido de reembolso' | quem: Gestor
+- Decisao_1 [decisao] 'Pedido aprovado pelo gestor?'
+- Passo_3 [tarefa_pessoa] 'Pagar reembolso' | quem: Financeiro
+    regra 1: O pagamento deve sair em até 5 dias úteis.
+- Passo_4 [envio] 'Avisar funcionário da recusa' | quem: Gestor
+- Fim_1 [fim] 'Pedido recusado e funcionário avisado'
+- Fim_2 [fim] 'Reembolso pago'
+- Passo_5 [tarefa_pessoa] 'Conferir notas do reembolso' | quem: Financeiro
 Conexões:
 - Inicio_1 -> Passo_1
 - Passo_1 -> Passo_2
@@ -410,96 +1211,70 @@ Conexões:
 - Passo_5 -> Passo_3
 ```
 
-Os elementos aparecem na ordem em que foram criados, não na ordem do fluxo. A ordem do
-fluxo é dada pelas conexões.
+A lista de conexões mostra o novo caminho. As conexões aparecem na ordem em que foram criadas, não na ordem do fluxo. E o agente, pela terceira vez, retoma a pergunta sobre a recusa.
 
-```mermaid
-flowchart LR
-    I(("Formulário<br/>enviado")) --> P1["Preencher formulário<br/><i>Funcionário</i>"]
-    P1 --> P2["Analisar pedido<br/><i>Gestor</i>"]
-    P2 --> D1{"Pedido aprovado<br/>pelo gestor?"}
-    D1 -- "Sim" --> P5["Conferir notas<br/><i>Financeiro</i>"]
-    P5 --> P3["Pagar reembolso<br/><i>Financeiro</i><br/>até 5 dias úteis"]
-    P3 --> F2(("Reembolso<br/>pago"))
-    D1 -- "Não" --> P4["Avisar funcionário<br/>da recusa<br/><i>Gestor</i>"]
-    P4 --> F1(("Pedido<br/>recusado"))
-```
+### A resposta que a pessoa vê
 
-### A conversa em números
-
-| Turno | Mensagem (resumida) | Chamadas à LLM | Tools |
-|---|---|---|---|
-| 1 | nome do processo | 2 | 1 |
-| 2 | primeiro passo | 2 | 2 |
-| 3 | análise, decisão e dois caminhos | 5 | 5 |
-| 4 | fim e prazo | 2 | 2 |
-| 5 | inserir conferência antes do pagamento | 3 | 3 |
-| 6 | trocar o responsável | 2 | 1 |
-| 7 | desfazer | 2 | 1 |
-| **Total** | | **18** | **15** |
-
-Nenhuma tool devolveu erro. Cada chamada à LLM reenvia as instruções completas com o
-resumo, então o custo de um turno cresce com o número de voltas.
+> Pronto, coloquei a conferência das notas pelo financeiro logo depois da aprovação e antes do pagamento.
+>
+> Ainda falta uma coisa: **quando o gestor recusa, o funcionário só é avisado ou ele pode corrigir o pedido e enviar de novo?**
 
 ---
 
-## 9. E quando a LLM erra? (exemplo construído)
+## A evolução do conhecimento
 
-Na conversa acima não houve erro de tool. Esta seção mostra o que **aconteceria**, usando
-o processo final como ponto de partida. As mensagens de erro são as que o código produz;
-o comportamento da LLM é o esperado, não uma transcrição.
+| Depois da mensagem | Elementos | Conexões | Participantes | Regras | Pontos em aberto | Chamadas à LLM | Tools |
+|---|---|---|---|---|---|---|---|
+| 1. reembolso de despesas de viagem | 0 | 0 | 0 | 0 | 0 | 2 | 1 |
+| 2. o funcionário preenche um formulá… | 2 | 1 | 1 | 0 | 2 | 4 | 4 |
+| 3. aí o gestor dele analisa. se apro… | 8 | 7 | 3 | 0 | 0 | 5 | 6 |
+| 4. depois que o financeiro paga acab… | 8 | 7 | 3 | 1 | 0 | 2 | 1 |
+| 5. esqueci: antes de pagar o finance… | 9 | 8 | 3 | 1 | 0 | 3 | 3 |
+| **Total** | | | | | | **16** | **15** |
 
-Suponha que o usuário diga "tira o passo do pedido" e a LLM peça:
 
-```text
-remover_elemento(id="pedido")
-```
+O número de elementos cresce a cada mensagem, e os pontos em aberto sobem e descem: sobem
+quando entra algo incompleto (mensagem 2) e zeram quando a pessoa fecha os caminhos
+(mensagem 3). É essa lista que conduz a entrevista.
 
-| # | Quem | O que faz |
-|---|---|---|
-| 1 | Nó `ferramentas` | Executa a tool `remover_elemento`. |
-| 2 | Modelo | `resolver("pedido")`: não é um id; nenhum nome é exatamente "pedido"; três nomes **contêm** "pedido". Lança `ErroModelo`. Nenhuma cópia é tirada e nada é alterado. |
-| 3 | Nó `ferramentas` | Captura o erro e devolve, como resultado da tool: `ERRO: 'pedido' é ambíguo. Use o id de um destes: Passo_2 (Analisar pedido de reembolso); Decisao_1 (Pedido aprovado pelo gestor?); Fim_1 (Pedido recusado).` |
-| 4 | Nó `agente` | Nova volta. A LLM lê o erro com os candidatos. |
+O custo acompanha as voltas: cada chamada à LLM reenvia as instruções, o estado e a
+conversa inteira. A mensagem 3, com cinco chamadas, custou mais que a 1 e a 4 juntas.
 
-A partir daí há dois desfechos esperados, ambos previstos nas instruções de `prompt.py`:
+## Quando a LLM erra
 
-- se o contexto deixar claro qual é o passo, a LLM repete o pedido com o id certo, sem
-  incomodar o usuário;
-- se não der para saber, ela pergunta: "Qual passo você quer tirar: a análise do pedido
-  pelo gestor ou...?".
+A mensagem 2 mostrou o caso mais comum: a LLM cita um elemento que não existe. O mesmo
+tratamento vale para três tipos de falha:
 
-```mermaid
-sequenceDiagram
-    participant L as LLM
-    participant F as Nó ferramentas
-    participant M as Modelo
-    L->>F: remover_elemento(id="pedido")
-    F->>M: remover_elemento("pedido")
-    M--xF: ErroModelo: ambíguo, candidatos...
-    F-->>L: "ERRO: 'pedido' é ambíguo. Use o id de um destes: ..."
-    L->>F: remover_elemento(id="Passo_2")
-    F->>M: remover_elemento("Passo_2")
-    M-->>F: "Removido Passo_2 '...'. Religado: Passo_1->Decisao_1."
-    F-->>L: resultado
-```
+| O que aconteceu | O que volta para a LLM |
+|---|---|
+| O modelo recusou o pedido (`ErroModelo`): elemento inexistente, nome ambíguo, operação inválida | `ERRO: ` + uma mensagem que diz como corrigir |
+| A LLM pediu uma tool que não existe | `ERRO: Ferramenta 'x' não existe.` |
+| Argumentos inválidos (faltando, tipo errado) | `ERRO ao chamar x: ...` |
 
-Três tipos de falha recebem esse mesmo tratamento: tool que não existe, pedido recusado
-pelo modelo (`ErroModelo`) e argumentos inválidos. Em nenhum deles o turno é interrompido.
-O único freio é o limite de 60 passos do grafo por turno (`LIMITE_PASSOS_GRAFO`).
+Em nenhum deles o turno é interrompido, e em nenhum deles o processo é alterado pela
+metade. O único freio é o limite de 60 passos do grafo por turno (`LIMITE_PASSOS_GRAFO`).
 
----
+## O que levar deste passo a passo
 
-## 10. O que levar deste passo a passo
-
-1. **Toda alteração no processo passa pelo mesmo funil:** LLM pede ➜ nó `ferramentas`
-   executa ➜ tool repassa ➜ modelo valida, copia e altera.
-2. **A LLM enxerga o processo pelo resumo**, refeito a cada chamada. É por ele que ela
+1. **Toda alteração passa pelo mesmo funil:** LLM pede ➜ nó `ferramentas` executa ➜ tool
+   repassa ➜ modelo valida, copia e altera ➜ persistência grava.
+2. **Só o nó `agente` fala com a LLM**, e sempre com o mesmo pacote: instruções, estado
+   atual, conversa e tools.
+3. **A LLM enxerga o processo pelo estado**, refeito a cada volta. É por ele que ela
    conhece os ids, sabe o que falta e percebe o efeito do que acabou de fazer.
-3. **Os "pontos em aberto" guiam a entrevista.** Quando a lista esvazia, o agente passa a
-   perguntar sobre exceções e a revisar.
-4. **O desenho é sempre recalculado do zero** a partir do modelo. Ninguém "move" caixas:
-   muda-se o processo, e o layout é consequência.
-5. **Para investigar um resultado estranho**, ligue a depuração (`--debug` no terminal ou
-   "Mostrar o que o agente fez" na página web) e veja a lista de tools: o problema está no pedido
-   da LLM ou no que o modelo fez com ele.
+4. **O JSON é a fonte da verdade.** O desenho, o `.bpmn` e a descrição em texto são
+   sempre gerados a partir dele.
+5. **O desenho é recalculado do zero** a cada alteração. Ninguém "move" caixas.
+6. **Para investigar um resultado estranho**, ligue a depuração (`--debug` no terminal ou
+   "Mostrar o que o agente fez" na página web) e veja a lista de tools: o problema está no
+   pedido da LLM ou no que o modelo fez com ele.
+
+## Como reproduzir
+
+```bash
+.venv/bin/python -m bpmn_agent.visao.terminal --debug
+```
+
+Digite as cinco mensagens acima. Os arquivos de cada sessão ficam em `sessoes/<id>/`, e
+`visualizar.html` nessa pasta mostra o desenho (recarregue a página depois de cada
+resposta).
