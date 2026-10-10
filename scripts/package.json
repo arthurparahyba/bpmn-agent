@@ -1,0 +1,10 @@
+{
+  "name": "bpmn-agent-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Ferramentas de verificação: validar XML BPMN e renderizar com bpmn-js offline",
+  "dependencies": {
+    "bpmn-js": "18.31.0",
+    "bpmn-moddle": "^10.3.1"
+  }
+}

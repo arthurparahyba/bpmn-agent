@@ -1,0 +1,6 @@
+.env
+sessoes/
+__pycache__/
+.pytest_cache/
+scripts/node_modules/
+scripts/package-lock.json

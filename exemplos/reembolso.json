@@ -1,0 +1,192 @@
+{
+  "nome": "Reembolso de despesas",
+  "descricao": "Funcionário pede reembolso de despesas de viagem",
+  "participantes": [
+    "Funcionário",
+    "Gestor",
+    "Financeiro"
+  ],
+  "elementos": {
+    "Inicio_1": {
+      "id": "Inicio_1",
+      "tipo": "startEvent",
+      "nome": "Início",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_1": {
+      "id": "Passo_1",
+      "tipo": "userTask",
+      "nome": "Enviar pedido com comprovantes",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_2": {
+      "id": "Passo_2",
+      "tipo": "userTask",
+      "nome": "Analisar pedido",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": [
+        "Prazo de 5 dias úteis"
+      ]
+    },
+    "Decisao_1": {
+      "id": "Decisao_1",
+      "tipo": "exclusiveGateway",
+      "nome": "Pedido aprovado?",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_3": {
+      "id": "Passo_3",
+      "tipo": "serviceTask",
+      "nome": "Agendar pagamento",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_1": {
+      "id": "Fim_1",
+      "tipo": "endEvent",
+      "nome": "Reembolso pago",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    },
+    "Decisao_2": {
+      "id": "Decisao_2",
+      "tipo": "exclusiveGateway",
+      "nome": "Dá para corrigir?",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_4": {
+      "id": "Passo_4",
+      "tipo": "sendTask",
+      "nome": "Avisar recusa",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Fim_2": {
+      "id": "Fim_2",
+      "tipo": "endEvent",
+      "nome": "Pedido recusado",
+      "responsavel": "Gestor",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_5": {
+      "id": "Passo_5",
+      "tipo": "userTask",
+      "nome": "Corrigir pedido",
+      "responsavel": "Funcionário",
+      "descricao": "",
+      "regras": []
+    },
+    "Passo_6": {
+      "id": "Passo_6",
+      "tipo": "serviceTask",
+      "nome": "Conferir limite da política",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    },
+    "Espera_1": {
+      "id": "Espera_1",
+      "tipo": "intermediateCatchEvent",
+      "nome": "Aguardar data de pagamento",
+      "responsavel": "Financeiro",
+      "descricao": "",
+      "regras": []
+    }
+  },
+  "fluxos": [
+    {
+      "id": "Fluxo_1",
+      "origem": "Inicio_1",
+      "destino": "Passo_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_2",
+      "origem": "Passo_6",
+      "destino": "Passo_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_3",
+      "origem": "Passo_2",
+      "destino": "Decisao_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_4",
+      "origem": "Decisao_1",
+      "destino": "Passo_3",
+      "rotulo": "Sim"
+    },
+    {
+      "id": "Fluxo_5",
+      "origem": "Espera_1",
+      "destino": "Fim_1",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_6",
+      "origem": "Decisao_1",
+      "destino": "Decisao_2",
+      "rotulo": "Não"
+    },
+    {
+      "id": "Fluxo_7",
+      "origem": "Decisao_2",
+      "destino": "Passo_4",
+      "rotulo": "Não"
+    },
+    {
+      "id": "Fluxo_8",
+      "origem": "Passo_4",
+      "destino": "Fim_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_9",
+      "origem": "Decisao_2",
+      "destino": "Passo_5",
+      "rotulo": "Sim"
+    },
+    {
+      "id": "Fluxo_10",
+      "origem": "Passo_5",
+      "destino": "Passo_2",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_11",
+      "origem": "Passo_1",
+      "destino": "Passo_6",
+      "rotulo": ""
+    },
+    {
+      "id": "Fluxo_12",
+      "origem": "Passo_3",
+      "destino": "Espera_1",
+      "rotulo": ""
+    }
+  ],
+  "pendencias": [],
+  "contadores": {
+    "Inicio": 1,
+    "Passo": 6,
+    "Fluxo": 12,
+    "Decisao": 2,
+    "Fim": 2,
+    "Espera": 1
+  }
+}

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="bpmn-agent (LangGraph)" exporterVersion="0.1">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="Reembolso de despesas" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" name="Reembolso de despesas" isExecutable="false">
+    <bpmn:documentation>Funcionário pede reembolso de despesas de viagem</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1" name="Funcionário">
+        <bpmn:flowNodeRef>Inicio_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Passo_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Passo_5</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2" name="Gestor">
+        <bpmn:flowNodeRef>Passo_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decisao_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Decisao_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Passo_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Fim_2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_3" name="Financeiro">
+        <bpmn:flowNodeRef>Passo_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Fim_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Passo_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Espera_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Inicio_1" name="Início">
+      <bpmn:outgoing>Fluxo_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Passo_1" name="Enviar pedido com comprovantes">
+      <bpmn:incoming>Fluxo_1</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_11</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Passo_2" name="Analisar pedido">
+      <bpmn:documentation>Regra: Prazo de 5 dias úteis</bpmn:documentation>
+      <bpmn:incoming>Fluxo_2</bpmn:incoming>
+      <bpmn:incoming>Fluxo_10</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Decisao_1" name="Pedido aprovado?">
+      <bpmn:incoming>Fluxo_3</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_4</bpmn:outgoing>
+      <bpmn:outgoing>Fluxo_6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Passo_3" name="Agendar pagamento">
+      <bpmn:incoming>Fluxo_4</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="Fim_1" name="Reembolso pago">
+      <bpmn:incoming>Fluxo_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Decisao_2" name="Dá para corrigir?">
+      <bpmn:incoming>Fluxo_6</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_7</bpmn:outgoing>
+      <bpmn:outgoing>Fluxo_9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Passo_4" name="Avisar recusa">
+      <bpmn:incoming>Fluxo_7</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_8</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="Fim_2" name="Pedido recusado">
+      <bpmn:incoming>Fluxo_8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Passo_5" name="Corrigir pedido">
+      <bpmn:incoming>Fluxo_9</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_10</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Passo_6" name="Conferir limite da política">
+      <bpmn:incoming>Fluxo_11</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="Espera_1" name="Aguardar data de pagamento">
+      <bpmn:incoming>Fluxo_12</bpmn:incoming>
+      <bpmn:outgoing>Fluxo_5</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_Espera_1" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="Fluxo_1" sourceRef="Inicio_1" targetRef="Passo_1" />
+    <bpmn:sequenceFlow id="Fluxo_2" sourceRef="Passo_6" targetRef="Passo_2" />
+    <bpmn:sequenceFlow id="Fluxo_3" sourceRef="Passo_2" targetRef="Decisao_1" />
+    <bpmn:sequenceFlow id="Fluxo_4" sourceRef="Decisao_1" targetRef="Passo_3" name="Sim" />
+    <bpmn:sequenceFlow id="Fluxo_5" sourceRef="Espera_1" targetRef="Fim_1" />
+    <bpmn:sequenceFlow id="Fluxo_6" sourceRef="Decisao_1" targetRef="Decisao_2" name="Não" />
+    <bpmn:sequenceFlow id="Fluxo_7" sourceRef="Decisao_2" targetRef="Passo_4" name="Não" />
+    <bpmn:sequenceFlow id="Fluxo_8" sourceRef="Passo_4" targetRef="Fim_2" />
+    <bpmn:sequenceFlow id="Fluxo_9" sourceRef="Decisao_2" targetRef="Passo_5" name="Sim" />
+    <bpmn:sequenceFlow id="Fluxo_10" sourceRef="Passo_5" targetRef="Passo_2" />
+    <bpmn:sequenceFlow id="Fluxo_11" sourceRef="Passo_1" targetRef="Passo_6" />
+    <bpmn:sequenceFlow id="Fluxo_12" sourceRef="Passo_3" targetRef="Espera_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_1_di" bpmnElement="Participant_1" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="1500" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_1_di" bpmnElement="Lane_1" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="1470" height="130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_2_di" bpmnElement="Lane_2" isHorizontal="true">
+        <dc:Bounds x="130" y="190" width="1470" height="130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_3_di" bpmnElement="Lane_3" isHorizontal="true">
+        <dc:Bounds x="130" y="320" width="1470" height="130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Inicio_1_di" bpmnElement="Inicio_1">
+        <dc:Bounds x="267" y="107" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="235" y="148" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_1_di" bpmnElement="Passo_1">
+        <dc:Bounds x="400" y="85" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_2_di" bpmnElement="Passo_2">
+        <dc:Bounds x="740" y="215" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Decisao_1_di" bpmnElement="Decisao_1" isMarkerVisible="true">
+        <dc:Bounds x="940" y="230" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="855" y="200" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_3_di" bpmnElement="Passo_3">
+        <dc:Bounds x="1080" y="345" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Fim_1_di" bpmnElement="Fim_1">
+        <dc:Bounds x="1457" y="367" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1425" y="408" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Decisao_2_di" bpmnElement="Decisao_2" isMarkerVisible="true">
+        <dc:Bounds x="1110" y="230" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1025" y="200" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_4_di" bpmnElement="Passo_4">
+        <dc:Bounds x="1250" y="215" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Fim_2_di" bpmnElement="Fim_2">
+        <dc:Bounds x="1457" y="237" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1425" y="278" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_5_di" bpmnElement="Passo_5">
+        <dc:Bounds x="1250" y="85" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Passo_6_di" bpmnElement="Passo_6">
+        <dc:Bounds x="570" y="345" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Espera_1_di" bpmnElement="Espera_1">
+        <dc:Bounds x="1287" y="367" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1255" y="408" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Fluxo_1_di" bpmnElement="Fluxo_1">
+        <di:waypoint x="303" y="125" />
+        <di:waypoint x="400" y="125" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_2_di" bpmnElement="Fluxo_2">
+        <di:waypoint x="680" y="385" />
+        <di:waypoint x="710" y="385" />
+        <di:waypoint x="710" y="255" />
+        <di:waypoint x="740" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_3_di" bpmnElement="Fluxo_3">
+        <di:waypoint x="850" y="255" />
+        <di:waypoint x="940" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_4_di" bpmnElement="Fluxo_4">
+        <di:waypoint x="965" y="280" />
+        <di:waypoint x="965" y="385" />
+        <di:waypoint x="1080" y="385" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="971" y="284" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_5_di" bpmnElement="Fluxo_5">
+        <di:waypoint x="1323" y="385" />
+        <di:waypoint x="1457" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_6_di" bpmnElement="Fluxo_6">
+        <di:waypoint x="990" y="255" />
+        <di:waypoint x="1110" y="255" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="996" y="237" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_7_di" bpmnElement="Fluxo_7">
+        <di:waypoint x="1160" y="255" />
+        <di:waypoint x="1250" y="255" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1166" y="237" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_8_di" bpmnElement="Fluxo_8">
+        <di:waypoint x="1360" y="255" />
+        <di:waypoint x="1457" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_9_di" bpmnElement="Fluxo_9">
+        <di:waypoint x="1135" y="230" />
+        <di:waypoint x="1135" y="125" />
+        <di:waypoint x="1250" y="125" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1141" y="212" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_10_di" bpmnElement="Fluxo_10">
+        <di:waypoint x="1305" y="165" />
+        <di:waypoint x="1305" y="182" />
+        <di:waypoint x="795" y="182" />
+        <di:waypoint x="795" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_11_di" bpmnElement="Fluxo_11">
+        <di:waypoint x="510" y="125" />
+        <di:waypoint x="540" y="125" />
+        <di:waypoint x="540" y="385" />
+        <di:waypoint x="570" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Fluxo_12_di" bpmnElement="Fluxo_12">
+        <di:waypoint x="1190" y="385" />
+        <di:waypoint x="1287" y="385" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
