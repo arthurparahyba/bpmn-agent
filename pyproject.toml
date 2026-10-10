@@ -13,6 +13,9 @@ dependencies = [
     "langchain-openai>=1.7",          # DeepSeek, Groq, OpenRouter, Ollama (APIs compatíveis com OpenAI)
     "langchain-anthropic>=1.7",       # Claude
     "langchain-google-genai>=4.4",    # Gemini
+    "fastapi>=0.115",                 # a API HTTP do backend
+    "uvicorn>=0.30",                  # servidor que roda a API
+    "httpx>=0.27",                    # cliente HTTP usado pela visão
     "streamlit>=1.50",
     "python-dotenv>=1.0",
 ]
@@ -25,3 +28,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = ["ignore:You should not use the 'timeout' argument with the TestClient"]

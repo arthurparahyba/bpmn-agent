@@ -1,9 +1,9 @@
 """
-Versão de terminal. A cada resposta, o diagrama é salvo em sessoes/<id>/ e
-`visualizar.html` é atualizado (abra no navegador e recarregue a página).
+Versão de terminal. Conversa com o serviço pela API (suba antes: python -m bpmn_agent.api.servidor).
+A cada resposta, `visualizar.html` é atualizado (abra no navegador e recarregue a página).
 
-    python -m bpmn_agent.visao.terminal                       # usa LLM_PROVEDOR do .env
-    python -m bpmn_agent.visao.terminal --provedor gemini
+    python -m bpmn_agent.visao.terminal
+    python -m bpmn_agent.visao.terminal --debug
     python -m bpmn_agent.visao.terminal --continuar sessoes/ab12cd34/processo.json
 
 Comandos: /desfazer  /resumo  /pendencias  /sair
@@ -11,37 +11,48 @@ Comandos: /desfazer  /resumo  /pendencias  /sair
 from __future__ import annotations
 
 import argparse
+import json
+import sys
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from bpmn_agent.app.agente.llm import criar_llm
-from bpmn_agent.app.persistencia import carregar_modelo
-from bpmn_agent.app.sessao import Sessao
+from bpmn_agent.visao.cliente import MENSAGEM_FORA_DO_AR, ApiForaDoAr, ClienteApi, ErroDaApi
 from bpmn_agent.visao.visualizador import html_visualizador
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv()    # só para BPMN_API_URL; o modelo e a chave são assunto do servidor
     ap = argparse.ArgumentParser(description="Entrevista para desenhar processos em BPMN")
-    ap.add_argument("--provedor")
-    ap.add_argument("--modelo")
     ap.add_argument("--continuar", help="arquivo processo.json de uma sessão anterior")
     ap.add_argument("--debug", action="store_true", help="mostra as ações do agente")
     args = ap.parse_args()
 
-    modelo = carregar_modelo(args.continuar) if args.continuar else None
-    sessao = Sessao(criar_llm(args.provedor, args.modelo), modelo=modelo)
-    sessao.salvar()
-    visual = sessao.pasta / "visualizar.html"
+    cliente = ClienteApi()
+    try:
+        processo = json.loads(Path(args.continuar).read_text(encoding="utf-8")) if args.continuar else None
+        estado = cliente.criar_sessao(processo)
+    except ApiForaDoAr:
+        sys.exit(f"⚠️  {MENSAGEM_FORA_DO_AR}\n   Endereço: {cliente.base_url}  |  Para ligar: python -m bpmn_agent.api.servidor")
+    except ErroDaApi as e:
+        sys.exit(f"⚠️  {e.mensagem}\n   {e.detalhe}")
+    except (OSError, ValueError) as e:
+        sys.exit(f"⚠️  Não consegui ler {args.continuar}: {e}")
 
-    def atualizar_visual(destaque=None):
-        visual.write_text(html_visualizador(sessao.bpmn_xml(), altura=800, destacar=destaque), encoding="utf-8")
+    id = estado["id"]
+    visual = Path(tempfile.gettempdir()) / "bpmn-agent" / id / "visualizar.html"
+    visual.parent.mkdir(parents=True, exist_ok=True)
+
+    def atualizar_visual(destaque=None) -> dict:
+        estado = cliente.estado(id)
+        visual.write_text(html_visualizador(estado["bpmn_xml"], altura=800, destacar=destaque), encoding="utf-8")
+        return estado
 
     atualizar_visual()
-    print(f"\n📁 Arquivos em: {sessao.pasta.resolve()}")
-    print(f"🖼  Abra no navegador (e recarregue após cada resposta): {visual.resolve().as_uri()}\n")
-    print(f"🧭 {sessao.historico_visivel()[-1][1]}\n")
+    print(f"\n📁 Arquivos (no servidor) em: {estado['pasta']}")
+    print(f"🖼  Abra no navegador (e recarregue após cada resposta): {visual.as_uri()}\n")
+    print(f"🧭 {estado['historico'][-1]['texto']}\n")
 
     while True:
         try:
@@ -52,23 +63,26 @@ def main() -> None:
             continue
         if texto == "/sair":
             break
-        if texto == "/desfazer":
-            print(sessao.modelo.desfazer()); sessao.salvar(); atualizar_visual(); continue
-        if texto == "/resumo":
-            print(sessao.modelo.narrativa(), "\n"); continue
-        if texto == "/pendencias":
-            print("\n".join(sessao.modelo.problemas() + sessao.modelo.p.pendencias) or "Nada em aberto."); continue
         try:
-            r = sessao.enviar(texto)
-        except Exception as e:
-            print(f"⚠️  Erro ao falar com o modelo: {e}\n"); continue
-        if args.debug:
-            for a in r.acoes:
-                print(f"   🔧 {a}")
-        atualizar_visual(r.alterados)
-        print(f"\n🧭 {r.texto}\n")
+            if texto == "/desfazer":
+                print(cliente.desfazer(id)["mensagem"]); atualizar_visual(); continue
+            if texto == "/resumo":
+                print(cliente.estado(id)["narrativa"], "\n"); continue
+            if texto == "/pendencias":
+                estado = cliente.estado(id)
+                print("\n".join(estado["em_aberto"] + estado["pendencias"]) or "Nada em aberto."); continue
+            r = cliente.enviar(id, texto)
+            if args.debug:
+                for a in r["acoes"]:
+                    print(f"   🔧 {a}")
+            atualizar_visual(r["alterados"])
+            print(f"\n🧭 {r['texto']}\n")
+        except ApiForaDoAr:
+            print(f"⚠️  {MENSAGEM_FORA_DO_AR}\n")
+        except ErroDaApi as e:
+            print(f"⚠️  {e.mensagem}" + (f"\n   {e.detalhe}" if e.detalhe else "") + "\n")
 
-    print(f"\nAté logo! Diagrama final: {(sessao.pasta / 'processo.bpmn').resolve()}")
+    print(f"\nAté logo! Diagrama final (no servidor): {estado['pasta']}/processo.bpmn")
 
 
 if __name__ == "__main__":

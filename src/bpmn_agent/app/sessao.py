@@ -2,7 +2,7 @@
 Sessao: a porta de entrada do backend para as interfaces.
 
 Uma conversa = um processo + um thread no LangGraph + arquivos salvos em disco.
-A visão conversa só com esta classe: envia o texto do usuário e recebe um RespostaTurno.
+A API conversa só com esta classe: envia o texto do usuário e recebe um RespostaTurno.
 """
 from __future__ import annotations
 
@@ -44,10 +44,6 @@ class Sessao:
             "Quer continuar de onde paramos ou mudar alguma coisa?")
         self.grafo.update_state(self.config, {"messages": [AIMessage(content=saudacao)]}, as_node="agente")
 
-    def trocar_llm(self, llm: BaseChatModel) -> None:
-        """Troca o modelo no meio da conversa, mantendo histórico e diagrama."""
-        self.grafo = construir_grafo(llm, self, self.checkpointer)
-
     # ----------------------------------------------------------------- conversa
     def enviar(self, texto_usuario: str) -> RespostaTurno:
         antes = {i: (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao)
@@ -69,6 +65,12 @@ class Sessao:
             if (f.origem, f.destino, f.rotulo) not in fluxos_antes:
                 alterados += [f.id]
         return RespostaTurno(texto=texto, acoes=acoes, alterados=alterados)
+
+    def desfazer(self) -> str:
+        """Desfaz a última alteração do diagrama (sem passar pelo LLM) e regrava os arquivos."""
+        resultado = self.modelo.desfazer()
+        self.salvar()
+        return resultado
 
     def mensagens(self) -> list[AnyMessage]:
         return self.grafo.get_state(self.config).values.get("messages", [])

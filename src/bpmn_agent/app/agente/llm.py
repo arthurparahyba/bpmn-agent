@@ -55,13 +55,18 @@ PROVEDORES = {
 }
 
 
-def criar_llm(provedor: str | None = None, modelo: str | None = None,
-              api_key: str | None = None, temperatura: float = 0.3) -> BaseChatModel:
+def llm_configurada(provedor: str | None = None, modelo: str | None = None) -> tuple[str, str]:
+    """(provedor, modelo) que serão usados: o que foi passado, senão o ambiente, senão o padrão."""
     provedor = (provedor or os.getenv("LLM_PROVEDOR") or "deepseek").lower()
     if provedor not in PROVEDORES:
         raise ValueError(f"Provedor '{provedor}' desconhecido. Opções: {', '.join(PROVEDORES)}")
+    return provedor, modelo or os.getenv("LLM_MODELO") or PROVEDORES[provedor]["modelo"]
+
+
+def criar_llm(provedor: str | None = None, modelo: str | None = None,
+              api_key: str | None = None, temperatura: float = 0.3) -> BaseChatModel:
+    provedor, modelo = llm_configurada(provedor, modelo)
     cfg = PROVEDORES[provedor]
-    modelo = modelo or os.getenv("LLM_MODELO") or cfg["modelo"]
     chave = api_key or (os.getenv(cfg["env_chave"]) if cfg["env_chave"] else "ollama")
     if not chave:
         raise ValueError(f"Defina {cfg['env_chave']} (crie a chave em {cfg['obter_chave']}).")
