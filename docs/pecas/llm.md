@@ -1,4 +1,4 @@
-# `bpmn_agent/llm.py` — a conexão com o provedor
+# `src/bpmn_agent/app/agente/llm.py` — a conexão com o provedor
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -66,9 +66,9 @@ previsíveis. Só é enviada aos provedores que usam `ChatOpenAI`.
 
 ## Quem usa
 
-- `app.py`: lê `PROVEDORES` para montar a barra lateral e chama `criar_llm` com o que o
+- `web.py`: lê `PROVEDORES` para montar a barra lateral e chama `criar_llm` com o que o
   usuário escolheu.
-- `cli.py`: chama `criar_llm` com as opções `--provedor` e `--modelo`.
+- `terminal.py`: chama `criar_llm` com as opções `--provedor` e `--modelo`.
 
 O objeto criado é entregue à `Sessao`, que o passa para `construir_grafo`.
 

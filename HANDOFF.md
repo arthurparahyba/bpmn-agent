@@ -20,14 +20,15 @@ diagrama BPMN aos poucos. Requisitos originais do dono do projeto:
 
 | Parte | Arquivo | Status |
 |---|---|---|
-| Modelo do processo + 17 operações + desfazer + validação | `bpmn_agent/modelo.py` | ✅ testado |
-| Exportação BPMN 2.0 com DI e layout automático | `bpmn_agent/exportar_bpmn.py` | ✅ 0 avisos no bpmn-moddle, conferido visualmente |
-| 17 tools para o LLM | `bpmn_agent/ferramentas.py` | ✅ esquemas aceitos por OpenAI-compat, Anthropic e Gemini |
-| Prompt de entrevista + saudação | `bpmn_agent/prompt.py` | ✅ testado em conversa real com `claude-haiku-5-5` |
-| Grafo LangGraph + `Sessao` | `bpmn_agent/agente.py` | ✅ testado com LLM roteirizada |
-| Fábrica de LLMs (6 provedores) | `bpmn_agent/llm.py` | ✅ Anthropic testado de verdade; ⚠️ os outros 5 só instanciam |
-| App Streamlit (chat + diagrama ao vivo) | `app.py` | ✅ testado no navegador headless com LLM roteirizada |
-| CLI | `cli.py` | ⚠️ não executado |
+| Modelo do processo + 17 operações + desfazer + validação | `src/bpmn_agent/app/dominio/modelo.py` | ✅ testado |
+| Exportação BPMN 2.0 com DI e layout automático | `src/bpmn_agent/app/exportacao/exportar_bpmn.py` | ✅ 0 avisos no bpmn-moddle, conferido visualmente |
+| 17 tools para o LLM | `src/bpmn_agent/app/agente/ferramentas.py` | ✅ esquemas aceitos por OpenAI-compat, Anthropic e Gemini |
+| Prompt de entrevista + saudação | `src/bpmn_agent/app/agente/prompt.py` | ✅ testado em conversa real com `claude-haiku-5-5` |
+| Grafo LangGraph | `app/agente/grafo.py` | ✅ testado com LLM roteirizada |
+| `Sessao` + gravação em disco | `app/sessao.py`, `app/persistencia.py` | ✅ testado com LLM roteirizada |
+| Fábrica de LLMs (6 provedores) | `src/bpmn_agent/app/agente/llm.py` | ✅ Anthropic testado de verdade; ⚠️ os outros 5 só instanciam |
+| App Streamlit (chat + diagrama ao vivo) | `web.py` | ✅ testado no navegador headless com LLM roteirizada |
+| CLI | `terminal.py` | ⚠️ não executado |
 | Testes | `tests/` | ✅ 15 passando |
 | Documentação para desenvolvedores | `docs/`, `PASSO_A_PASSO.md` | ✅ visão geral, uma página por peça, glossário e conversa real comentada |
 
@@ -46,9 +47,13 @@ DeepSeek, Gemini, Groq, OpenRouter e Ollama continuam sem teste real.
 
 ## 3. Arquitetura
 
+Refatorado em 10/10/2026 para `src/bpmn_agent/{app,visao}` (backend e visão separados; caminhos
+abaixo são relativos a `src/bpmn_agent/`). Estrutura, regras de camada e diagramas em
+`docs/README.md`; uma página por peça em `docs/pecas/`.
+
 ```
-app.py / cli.py
-   └── Sessao (agente.py) ── modelo: ModeloProcesso ── salvar() → sessoes/<id>/{json,bpmn,md}
+visao/web.py / visao/terminal.py
+   └── Sessao (app/sessao.py) ── modelo: ModeloProcesso ── salvar() → persistencia → sessoes/<id>/{json,bpmn,md}
          └── grafo LangGraph (MessagesState, MemorySaver, thread_id = sessao.id)
 
 START → agente ──(tool_calls?)──► ferramentas ──► agente ──► … ──► END
@@ -69,7 +74,7 @@ START → agente ──(tool_calls?)──► ferramentas ──► agente ─�
   perder conversa.
 - Tools são closures sobre a `sessao` (várias sessões em paralelo no mesmo processo).
 
-### Modelo (`modelo.py`)
+### Modelo (`app/dominio/`)
 
 - `Processo` (dataclass): `nome, descricao, participantes, elementos{id: Elemento}, fluxos[Fluxo],
   pendencias, contadores`.
@@ -135,7 +140,7 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
 
 ## 6. Próximos passos (em ordem de prioridade)
 
-1. **Conversa real nos outros provedores** (feita só com Anthropic). Rodar `python cli.py --debug` com DeepSeek e com
+1. **Conversa real nos outros provedores** (feita só com Anthropic). Rodar `python -m bpmn_agent.visao.terminal --debug` com DeepSeek e com
    Gemini; conduzir o exemplo do reembolso e anotar: o agente faz 1 pergunta por vez? usa jargão?
    chama as tools certas? sobra ponta solta? Ajustar `prompt.py` com base nisso.
 2. **Suíte de avaliação com LLM real** (`tests/avaliacao/`, marcada para não rodar no CI):

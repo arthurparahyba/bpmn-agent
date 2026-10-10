@@ -1,4 +1,4 @@
-# `bpmn_agent/exportar_bpmn.py` — posições e arquivo `.bpmn`
+# `src/bpmn_agent/app/exportacao/exportar_bpmn.py` — posições e arquivo `.bpmn`
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -138,7 +138,8 @@ O rótulo de uma conexão fica colado no começo da seta. O nome de uma decisão
 
 ## Quem usa
 
-- `Sessao.bpmn_xml()` e `Sessao.salvar()`, em `agente.py`.
+- `Sessao.bpmn_xml()`, em `sessao.py`.
+- `salvar_artefatos()`, em `persistencia.py`.
 - `scripts/gerar_exemplo.py`.
 
 ## Cuidados ao alterar

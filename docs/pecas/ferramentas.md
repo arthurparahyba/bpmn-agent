@@ -1,4 +1,4 @@
-# `bpmn_agent/ferramentas.py` — as tools que a LLM pode chamar
+# `src/bpmn_agent/app/agente/ferramentas.py` — as tools que a LLM pode chamar
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -101,12 +101,12 @@ Sempre um texto curto. Exemplos reais:
 | `conectar(origem="Nao_existe", destino="Passo_1")` | `ERRO: Não encontrei nenhum elemento 'Nao_existe'. Consulte os ids no estado atual.` |
 
 Os resultados trazem os ids criados, e a LLM usa esses ids nas chamadas seguintes do mesmo
-turno. O prefixo `ERRO:` é colocado pelo nó `ferramentas` de [agente.py](agente.md), não
+turno. O prefixo `ERRO:` é colocado pelo nó `ferramentas` de [grafo.py](grafo.md), não
 aqui.
 
 ## Quem usa
 
-Só `construir_grafo`, em `agente.py`, que entrega a lista à LLM (`bind_tools`) e a usa
+Só `construir_grafo`, em `grafo.py`, que entrega a lista à LLM (`bind_tools`) e a usa
 para executar os pedidos.
 
 ## Cuidados ao alterar

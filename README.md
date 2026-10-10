@@ -12,9 +12,9 @@ fluxo de trabalho com perguntas simples, uma de cada vez, e vai montando um diag
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # coloque a chave de um provedor
-streamlit run app.py          # interface web (chat + diagrama ao vivo)
+streamlit run src/bpmn_agent/visao/web.py     # interface web (chat + diagrama ao vivo)
 # ou
-python cli.py --debug         # terminal; gera sessoes/<id>/visualizar.html
+python -m bpmn_agent.visao.terminal --debug         # terminal; gera sessoes/<id>/visualizar.html
 python -m pytest              # testes (não usam API)
 ```
 
@@ -41,16 +41,28 @@ Uma conversa típica (15–25 turnos) consome poucas centenas de milhares de tok
 ## Arquitetura
 
 ```
-app.py / cli.py            interfaces
-bpmn_agent/
-  agente.py                grafo LangGraph + Sessao (histórico, salvar, trocar modelo)
-  prompt.py                personalidade e roteiro da entrevista
-  ferramentas.py           17 tools que o LLM chama para editar o diagrama
-  modelo.py                modelo do processo: operações, desfazer, validação, resumo
-  exportar_bpmn.py         BPMN 2.0 XML + layout automático (raias, colunas, rotas)
-  visualizador.py          HTML com bpmn-js para mostrar o diagrama
-  llm.py                   fábrica de LLMs (6 provedores)
+src/bpmn_agent/
+  visao/                   o que a pessoa vê
+    web.py                 página web (Streamlit)
+    terminal.py            conversa no terminal
+    visualizador.py        HTML com bpmn-js para mostrar o diagrama
+  app/                     backend (não depende da visão)
+    sessao.py              Sessao: histórico, enviar, trocar modelo
+    persistencia.py        gravar e ler arquivos
+    agente/
+      grafo.py             grafo LangGraph (nó agente + nó ferramentas)
+      ferramentas.py       17 tools que o LLM chama para editar o diagrama
+      prompt.py            personalidade e roteiro da entrevista
+      llm.py               fábrica de LLMs (6 provedores)
+    dominio/
+      processo.py          dados: Processo, Elemento, Fluxo
+      modelo.py            ModeloProcesso: operações de edição e desfazer
+      analise.py           pontos em aberto, raias
+      textos.py            resumo (para o LLM) e narrativa (para pessoas)
+    exportacao/
+      exportar_bpmn.py     BPMN 2.0 XML + layout automático (raias, colunas, rotas)
 scripts/                   validar .bpmn (bpmn-moddle), renderizar PNG, gerar exemplo
+docs/, PASSO_A_PASSO.md    documentação para desenvolvedores
 CLAUDE.md, HANDOFF.md      contexto para continuar no Claude Code
 ```
 

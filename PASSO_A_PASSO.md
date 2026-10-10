@@ -27,24 +27,25 @@ flowchart LR
     Q -- "não" --> R(["resposta em texto<br/>para o usuário"])
 ```
 
-Quem é quem nas tabelas:
+Quem é quem nas tabelas (caminhos a partir de `src/bpmn_agent/`):
 
 | Nome | Arquivo | Papel |
 |---|---|---|
-| Interface | `app.py` ou `cli.py` | Recebe o texto e mostra a resposta. |
-| `Sessao` | `bpmn_agent/agente.py` | Dona da conversa; roda o turno. |
-| Nó `agente` | `bpmn_agent/agente.py` | Chama a LLM. |
-| Nó `ferramentas` | `bpmn_agent/agente.py` | Executa as tools pedidas. |
-| Tool | `bpmn_agent/ferramentas.py` | Repassa o pedido ao modelo. |
-| Modelo | `bpmn_agent/modelo.py` | Altera o processo de verdade. |
-| Exportador | `bpmn_agent/exportar_bpmn.py` | Gera o arquivo `.bpmn`. |
-| Visualizador | `bpmn_agent/visualizador.py` | Gera a página que desenha. |
+| Interface | `visao/web.py` ou `visao/terminal.py` | Recebe o texto e mostra a resposta. |
+| `Sessao` | `app/sessao.py` | Dona da conversa; roda o turno. |
+| Nó `agente` | `app/agente/grafo.py` | Chama a LLM. |
+| Nó `ferramentas` | `app/agente/grafo.py` | Executa as tools pedidas. |
+| Tool | `app/agente/ferramentas.py` | Repassa o pedido ao modelo. |
+| Modelo | `app/dominio/modelo.py` | Altera o processo de verdade. |
+| Exportador | `app/exportacao/exportar_bpmn.py` | Gera o arquivo `.bpmn`. |
+| Visualizador | `visao/visualizador.py` | Gera a página que desenha. |
+| Persistência | `app/persistencia.py` | Grava os arquivos em disco. |
 
 ---
 
 ## 0. Antes da primeira mensagem
 
-O usuário abre o app. Nenhuma LLM é chamada ainda.
+O usuário abre a página web. Nenhuma LLM é chamada ainda.
 
 | # | Quem | O que faz |
 |---|---|---|
@@ -90,7 +91,7 @@ definir_processo(nome="Reembolso de despesas de viagem",
 | 7 | Tool `definir_processo` | Chama `modelo.definir_processo(nome, descricao)`. |
 | 8 | Modelo | Tira a cópia para o desfazer, grava nome e descrição, devolve `Processo agora se chama 'Reembolso de despesas de viagem'.` |
 | 9 | Nó `ferramentas` | Embrulha o texto em uma `ToolMessage` e chama `sessao.salvar()`. |
-| 10 | `Sessao.salvar` | Grava `processo.json`, `processo.bpmn` (via exportador) e `processo.md` em `sessoes/1da7e80f/`. |
+| 10 | `Sessao.salvar` | Chama `persistencia.salvar_artefatos`, que grava `processo.json`, `processo.bpmn` (via exportador) e `processo.md` em `sessoes/1da7e80f/`. |
 
 ### Volta 2: a LLM responde
 
@@ -500,5 +501,5 @@ O único freio é o limite de 60 passos do grafo por turno (`LIMITE_PASSOS_GRAFO
 4. **O desenho é sempre recalculado do zero** a partir do modelo. Ninguém "move" caixas:
    muda-se o processo, e o layout é consequência.
 5. **Para investigar um resultado estranho**, ligue a depuração (`--debug` no terminal ou
-   "Mostrar o que o agente fez" no app) e veja a lista de tools: o problema está no pedido
+   "Mostrar o que o agente fez" na página web) e veja a lista de tools: o problema está no pedido
    da LLM ou no que o modelo fez com ele.

@@ -1,4 +1,4 @@
-# `bpmn_agent/prompt.py` — as instruções do entrevistador
+# `src/bpmn_agent/app/agente/prompt.py` — as instruções do entrevistador
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -26,7 +26,7 @@ flowchart LR
     J --> L["instruções completas<br/>enviadas à LLM"]
 ```
 
-A junção acontece em [agente.py](agente.md), **a cada chamada à LLM**, inclusive nas
+A junção acontece em [grafo.py](grafo.md), **a cada chamada à LLM**, inclusive nas
 voltas do laço dentro de um mesmo turno. É por isso que a LLM sempre enxerga o processo
 atualizado.
 
@@ -66,7 +66,8 @@ agente nem nos textos da interface.
 
 ## Quem usa
 
-Só `agente.py`: a `SAUDACAO` ao criar a `Sessao` e o `SYSTEM_PROMPT` no nó `agente`.
+A `SAUDACAO` é usada por `sessao.py`, ao criar a `Sessao`. O `SYSTEM_PROMPT` é usado por
+`grafo.py`, no nó `agente`.
 
 ## Cuidados ao alterar
 

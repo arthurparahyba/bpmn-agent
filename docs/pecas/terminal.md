@@ -1,10 +1,10 @@
-# `cli.py` — a conversa no terminal
+# `src/bpmn_agent/visao/terminal.py` — a conversa no terminal
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
 ## Em uma frase
 
-A mesma entrevista do app web, em modo texto. É a forma mais rápida de testar o agente e
+A mesma entrevista da página web, em modo texto. É a forma mais rápida de testar o agente e
 de ver exatamente o que ele fez.
 
 ## Responsabilidade
@@ -17,7 +17,7 @@ de ver exatamente o que ele fez.
 ## Como usar
 
 ```bash
-.venv/bin/python cli.py --debug
+.venv/bin/python -m bpmn_agent.visao.terminal --debug
 ```
 
 | Opção | Efeito |
@@ -74,11 +74,12 @@ As linhas com 🔧 são `RespostaTurno.acoes`: o nome da tool e o texto que ela 
 
 ## Quem usa e quem é usado
 
-- **Usa**: `Sessao`, `criar_llm`, `ModeloProcesso.carregar` e `html_visualizador`.
+- **Usa**: `Sessao`, `criar_llm`, `carregar_modelo` e `html_visualizador`.
 - **Usado por**: ninguém; é um ponto de entrada.
 
 ## Cuidados ao alterar
 
-- O `.env` é procurado a partir da pasta onde está o `cli.py`, subindo pelas pastas acima.
+- O `.env` é procurado a partir da pasta onde está o `terminal.py`, subindo pelas pastas
+  acima até achar o da raiz do projeto.
 - `/desfazer` volta uma operação, não um turno inteiro (veja "Desfazer" em
   [modelo.md](modelo.md)).

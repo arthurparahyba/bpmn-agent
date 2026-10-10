@@ -1,4 +1,4 @@
-# `app.py` — a página web
+# `src/bpmn_agent/visao/web.py` — a página web
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -14,7 +14,7 @@ A tela que o usuário final usa: chat à esquerda, desenho ao vivo à direita.
 - Criar, trocar e recarregar a `Sessao`.
 
 Não tem regra de processo nem fala com a LLM diretamente: tudo passa pela
-[`Sessao`](agente.md).
+[`Sessao`](sessao.md).
 
 ## A tela
 
@@ -64,7 +64,7 @@ em `st.session_state`:
 ```mermaid
 sequenceDiagram
     actor U as Usuário
-    participant A as app.py
+    participant A as web.py
     participant S as Sessao
     U->>A: escreve e envia
     A->>A: mostra a mensagem e o aviso "Pensando..."
@@ -106,9 +106,10 @@ um aviso pedindo a chave, em vez do chat.
 
 ## Quem usa e quem é usado
 
-- **Usa**: `Sessao` (`agente.py`), `PROVEDORES` e `criar_llm` (`llm.py`), `ModeloProcesso`
+- **Usa**: `Sessao` (`sessao.py`), `PROVEDORES` e `criar_llm` (`llm.py`), `ModeloProcesso`
   (para carregar o `.json`) e `html_visualizador`.
-- **Usado por**: ninguém; é o ponto de entrada. Rode com `streamlit run app.py`.
+- **Usado por**: ninguém; é o ponto de entrada. Rode, da raiz do projeto, com
+  `streamlit run src/bpmn_agent/visao/web.py`.
 
 ## Cuidados ao alterar
 

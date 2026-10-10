@@ -1,4 +1,4 @@
-# `bpmn_agent/modelo.py` — o processo e suas regras
+# `src/bpmn_agent/app/dominio/` — o processo e suas regras
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -16,8 +16,36 @@ Guarda o processo que está sendo desenhado e é o **único lugar** que pode alt
 - Descrever o processo em texto, para a LLM (`resumo`) e para pessoas (`narrativa`).
 - Salvar e carregar em JSON.
 
-Não sabe nada de LLM, de tela nem de XML. Pode ser usado sozinho em um script (veja
-`scripts/gerar_exemplo.py`).
+Não sabe nada de LLM, de tela, de XML nem de arquivos. Pode ser usado sozinho em um
+script (veja `scripts/gerar_exemplo.py`).
+
+## Os quatro arquivos
+
+```mermaid
+flowchart TB
+    M["modelo.py<br/>ModeloProcesso: edição e desfazer<br/><b>o único que altera o processo</b>"]
+    A["analise.py<br/>pontos em aberto, raias<br/>só leitura"]
+    T["textos.py<br/>resumo e narrativa<br/>só leitura"]
+    P["processo.py<br/>os dados e os tipos"]
+    M --> A
+    M --> T
+    T --> A
+    M --> P
+    A --> P
+    T --> P
+```
+
+| Arquivo | O que tem |
+|---|---|
+| `processo.py` | As estruturas de dados (`Processo`, `Elemento`, `Fluxo`), a tabela de tipos e o `ErroModelo`. Nenhuma operação. |
+| `modelo.py` | A classe `ModeloProcesso`: todas as operações de edição, o desfazer e a conversão de/para dicionário. |
+| `analise.py` | Funções que avaliam o processo sem alterá-lo: `problemas` e `raia_de`. |
+| `textos.py` | Funções que descrevem o processo sem alterá-lo: `resumo` e `narrativa`. |
+
+Quem usa o domínio importa de `bpmn_agent.app.dominio` e chama tudo pela classe:
+`modelo.problemas()`, `modelo.resumo()` etc. Esses métodos são atalhos de uma linha para
+as funções de `analise.py` e `textos.py`. A divisão existe para deixar claro o que muda o
+processo (só `modelo.py`) e o que apenas lê.
 
 ## Os dados
 
@@ -176,7 +204,7 @@ Antes de cada alteração, `_snapshot()` guarda uma cópia completa do `Processo
 Atenção: um turno do agente costuma fazer várias operações, e cada uma gera uma cópia.
 "Desfazer" volta **uma operação**, não um turno inteiro.
 
-## Pontos em aberto: `problemas()`
+## Pontos em aberto: `problemas()` (em `analise.py`)
 
 Devolve uma lista de frases em linguagem simples. A LLM lê essa lista no resumo e a usa
 para decidir o que perguntar. O que é verificado:
@@ -195,7 +223,7 @@ para decidir o que perguntar. O que é verificado:
 Início, fim, decisão, paralelo e espera **não** são cobrados por responsável: não são
 trabalho de alguém.
 
-## Em que raia cada coisa aparece: `raia_de(id)`
+## Em que raia cada coisa aparece: `raia_de(id)` (em `analise.py`)
 
 Um passo aparece na raia do seu responsável. Início, fim, decisão, paralelo e espera que
 não têm responsável próprio **herdam** a raia do passo mais próximo: o método procura
@@ -207,29 +235,35 @@ Exemplo: a decisão "Pedido aprovado?" vem logo depois de "Analisar pedido" (Ges
 Um passo comum sem responsável não herda nada: vai para a raia "(sem responsável)" e
 aparece como ponto em aberto, porque aí falta mesmo uma informação.
 
-## Duas descrições em texto
+## Duas descrições em texto (em `textos.py`)
 
 | Método | Para quem | Como é |
 |---|---|---|
 | `resumo()` | A LLM | Compacto, com ids: lista de elementos, lista de conexões, pontos em aberto e pendências. Vai dentro das instruções a cada chamada. |
-| `narrativa()` | Pessoas | Lista numerada em markdown, sem ids, na ordem do fluxo. Aparece na aba "Descrição" do app e é salva em `processo.md`. |
+| `narrativa()` | Pessoas | Lista numerada em markdown, sem ids, na ordem do fluxo. Aparece na aba "Descrição" da página web e é salva em `processo.md`. |
 
-## Salvar e carregar
+## Conversão para gravar
 
-`salvar(caminho)` grava o `Processo` como JSON. `carregar(caminho)` e `de_dict(dados)`
-fazem o caminho de volta. A pilha do desfazer não é salva.
+`para_dict()` devolve o `Processo` como um dicionário comum, e `de_dict(dados)` faz o
+caminho de volta. O domínio para aí: quem transforma o dicionário em arquivo é
+`app/persistencia.py` (veja [sessao.md](sessao.md)). A pilha do desfazer não entra no
+dicionário.
 
 ## Quem usa
 
 - `ferramentas.py` chama as operações de edição.
-- `agente.py` chama `resumo()`, `narrativa()` e `salvar()`.
+- `agente/grafo.py` chama `resumo()`.
+- `persistencia.py` chama `para_dict()`, `de_dict()` e `narrativa()`.
 - `exportar_bpmn.py` lê `p` e chama `raia_de()`, `entradas()` e `saidas()`.
-- `app.py` e `cli.py` chamam `narrativa()`, `problemas()`, `desfazer()` e `carregar()`.
+- `web.py` e `terminal.py` chamam `narrativa()`, `problemas()`, `desfazer()` e `de_dict()`.
 
 ## Cuidados ao alterar
 
 - Toda operação que muda dados precisa chamar `self._snapshot()` **antes** de mudar e
   **depois** de validar.
 - Erro de uso é sempre `ErroModelo`, com mensagem que diga como corrigir.
+- `analise.py` e `textos.py` só leem. Se uma função nova precisa alterar o processo, o
+  lugar dela é um método de `ModeloProcesso`.
+- Nada aqui pode importar LLM, tela ou arquivos (`json`, `pathlib`).
 - Nova operação de edição só fica disponível para a LLM depois de ganhar uma tool em
   `ferramentas.py`. E precisa de teste em `tests/test_modelo.py`.

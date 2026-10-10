@@ -66,11 +66,19 @@ crases são nomes que aparecem no código.
 
 | Termo | Significado |
 |---|---|
+| **Backend** | A parte do programa que faz o trabalho e não aparece na tela. Aqui é a pasta `app`. |
+| **Camada** | Grupo de arquivos com um papel só, que pode usar as camadas abaixo dela mas não as de cima. As nossas: visão, sessão, agente, exportação, domínio. |
 | **Closure** | Função criada dentro de outra, que "lembra" as variáveis de onde nasceu. As tools são closures que lembram a qual sessão pertencem. |
 | **Dataclass** | Classe Python que só guarda dados, declarada de forma curta. `Elemento`, `Fluxo` e `Processo` são dataclasses. |
+| **Domínio** | O miolo do programa: os dados do processo e as regras para alterá-lo, sem LLM, sem tela e sem arquivos. Pasta `app/dominio`. |
 | **Determinístico** | Que dá sempre o mesmo resultado para a mesma entrada. O modelo e o exportador são assim; a LLM não é. |
+| **Instalação editável** | Forma de instalar o projeto em que o Python passa a usar direto os arquivos de `src/`, sem copiá-los. Mudou o código, já vale. É o que `pip install -r requirements.txt` faz. |
+| **Pacote** | Pasta com código Python que pode ser importada (`bpmn_agent`, `bpmn_agent.app.dominio`...). |
+| **Persistência** | Guardar dados em disco para que sobrevivam ao fim do programa. Arquivo `app/persistencia.py`. |
+| **`pyproject.toml`** | Arquivo que descreve o projeto para o Python: nome, dependências e onde está o código. |
 | **Snapshot** | Cópia completa do processo tirada antes de cada alteração. É o que torna o "desfazer" possível. |
 | **Ordem topológica** | Ordenar os elementos de modo que cada um apareça depois de todos os que levam até ele. Usada para decidir as colunas do desenho. |
 | **Busca em profundidade** (DFS) | Jeito de percorrer um grafo seguindo um caminho até o fim antes de tentar o próximo. Usada para achar as voltas. |
+| **Visão** | A parte do programa que a pessoa vê e usa: a página web e o terminal. Pasta `visao`. |
 | **XML** | Formato de texto com marcações entre `<` e `>`. O arquivo `.bpmn` é um XML. |
 | **`.env`** | Arquivo local com configurações e segredos (provedor, modelo, chave de API). |

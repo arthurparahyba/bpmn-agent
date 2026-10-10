@@ -34,53 +34,113 @@ Três consequências práticas:
    o estado atual do processo dentro das instruções. Por isso o histórico da conversa pode
    ser cortado sem que ela "esqueça" o diagrama.
 
-## 3. As peças
+## 3. Como o código está organizado
+
+Todo o código fica em `src/bpmn_agent/`, dividido em duas partes: **`visao`** (o que a
+pessoa vê) e **`app`** (o backend, que funciona sem tela nenhuma).
+
+```text
+src/bpmn_agent/
+  visao/                     O QUE A PESSOA VÊ
+    web.py                   página web (Streamlit)
+    terminal.py              conversa no terminal
+    visualizador.py          página que desenha o diagrama
+  app/                       BACKEND
+    sessao.py                porta de entrada: uma conversa completa
+    persistencia.py          gravar e ler arquivos
+    agente/                  a parte que usa a LLM
+      grafo.py               o laço "chama a LLM / executa as tools"
+      ferramentas.py         as 17 tools
+      prompt.py              instruções do entrevistador
+      llm.py                 conexão com o provedor
+    dominio/                 o processo e suas regras (sem LLM, sem tela, sem disco)
+      processo.py            os dados
+      modelo.py              as operações de edição e o desfazer
+      analise.py             o que falta no processo; em que raia cada coisa fica
+      textos.py              descrições em texto
+    exportacao/
+      exportar_bpmn.py       posições + arquivo .bpmn
+tests/      testes automáticos
+scripts/    utilitários de conferência
+```
+
+### As camadas e quem pode usar quem
 
 ```mermaid
 flowchart TB
-    subgraph interfaces["Interfaces: onde a pessoa conversa"]
-        APP["app.py<br/>página web"]
-        CLI["cli.py<br/>terminal"]
+    subgraph visao["visao: o que a pessoa vê"]
+        WEB["web.py"]
+        TER["terminal.py"]
+        VIS["visualizador.py"]
     end
 
-    subgraph orquestracao["Orquestração: quem coordena o turno"]
-        SES["agente.py<br/>Sessao + grafo de 2 nós"]
-        PRO["prompt.py<br/>instruções do entrevistador"]
-        LLM["llm.py<br/>conexão com o provedor"]
-    end
-
-    subgraph nucleo["Núcleo: código sem IA"]
-        FER["ferramentas.py<br/>17 tools"]
-        MOD["modelo.py<br/>o processo e suas regras"]
-        EXP["exportar_bpmn.py<br/>posições + arquivo .bpmn"]
-        VIS["visualizador.py<br/>página que desenha"]
+    subgraph app["app: backend"]
+        SES["sessao.py<br/>porta de entrada"]
+        PER["persistencia.py<br/>arquivos"]
+        subgraph agente["agente: usa a LLM"]
+            GRA["grafo.py"]
+            FER["ferramentas.py"]
+            PRO["prompt.py"]
+            LLM["llm.py"]
+        end
+        EXP["exportacao<br/>exportar_bpmn.py"]
+        subgraph dominio["dominio: o processo e suas regras"]
+            MOD["modelo.py"]
+            ANA["analise.py"]
+            TEX["textos.py"]
+            DAD["processo.py"]
+        end
     end
 
     DISCO[("sessoes/id/<br/>json, bpmn, md")]
 
-    APP --> SES
-    CLI --> SES
-    PRO --> SES
-    LLM --> SES
-    SES --> FER --> MOD
-    SES -- "lê o resumo" --> MOD
-    MOD --> EXP --> VIS
-    SES -- "salva" --> DISCO
-    VIS --> APP
-    VIS --> CLI
+    WEB --> SES
+    TER --> SES
+    WEB --> LLM
+    TER --> LLM
+    SES --> GRA
+    SES --> PER
+    SES --> EXP
+    GRA --> FER
+    GRA --> PRO
+    FER --> MOD
+    GRA -- "lê o resumo" --> MOD
+    MOD --> ANA
+    MOD --> TEX
+    MOD --> DAD
+    EXP --> MOD
+    PER --> EXP
+    PER --> DISCO
 ```
+
+As setas apontam sempre para baixo. As regras são:
+
+| Camada | Pode usar | Nunca usa |
+|---|---|---|
+| `app/dominio` | Só o próprio domínio e a biblioteca padrão do Python. | LLM, tela, arquivos. |
+| `app/exportacao` | `dominio`. | O resto. |
+| `app/persistencia.py` | `dominio`, `exportacao`. | `agente`, `visao`. |
+| `app/agente` | `dominio` e as bibliotecas de IA. | `exportacao`, `persistencia`, `sessao`, `visao`. |
+| `app/sessao.py` | Tudo de `app`. | `visao`. |
+| `visao` | `app`. | — |
+
+Na prática: **`app` nunca importa `visao`**, nem Streamlit, nem lê o `.env`. É isso que
+permite trocar a tela (ou rodar testes) sem tocar no backend.
+
+### As peças, uma por uma
 
 | Peça | Em uma frase | Detalhe |
 |---|---|---|
-| `app.py` | Página web com o chat à esquerda e o desenho à direita. | [pecas/app.md](pecas/app.md) |
-| `cli.py` | A mesma conversa, no terminal. | [pecas/cli.md](pecas/cli.md) |
-| `bpmn_agent/agente.py` | Coordena um turno: chama a LLM, executa as tools, salva. | [pecas/agente.md](pecas/agente.md) |
-| `bpmn_agent/prompt.py` | O texto que ensina a LLM a entrevistar. | [pecas/prompt.md](pecas/prompt.md) |
-| `bpmn_agent/llm.py` | Cria a conexão com o provedor escolhido. | [pecas/llm.md](pecas/llm.md) |
-| `bpmn_agent/ferramentas.py` | Apresenta as operações do modelo para a LLM. | [pecas/ferramentas.md](pecas/ferramentas.md) |
-| `bpmn_agent/modelo.py` | Guarda o processo e faz todas as alterações. | [pecas/modelo.md](pecas/modelo.md) |
-| `bpmn_agent/exportar_bpmn.py` | Calcula as posições e escreve o arquivo `.bpmn`. | [pecas/exportar_bpmn.md](pecas/exportar_bpmn.md) |
-| `bpmn_agent/visualizador.py` | Gera a página que desenha o `.bpmn` no navegador. | [pecas/visualizador.md](pecas/visualizador.md) |
+| `visao/web.py` | Página web com o chat à esquerda e o desenho à direita. | [pecas/web.md](pecas/web.md) |
+| `visao/terminal.py` | A mesma conversa, no terminal. | [pecas/terminal.md](pecas/terminal.md) |
+| `visao/visualizador.py` | Gera a página que desenha o `.bpmn` no navegador. | [pecas/visualizador.md](pecas/visualizador.md) |
+| `app/sessao.py` e `app/persistencia.py` | Uma conversa completa, e a gravação dos arquivos. | [pecas/sessao.md](pecas/sessao.md) |
+| `app/agente/grafo.py` | O laço de um turno: chama a LLM, executa as tools. | [pecas/grafo.md](pecas/grafo.md) |
+| `app/agente/ferramentas.py` | Apresenta as operações do modelo para a LLM. | [pecas/ferramentas.md](pecas/ferramentas.md) |
+| `app/agente/prompt.py` | O texto que ensina a LLM a entrevistar. | [pecas/prompt.md](pecas/prompt.md) |
+| `app/agente/llm.py` | Cria a conexão com o provedor escolhido. | [pecas/llm.md](pecas/llm.md) |
+| `app/dominio/` | Guarda o processo e faz todas as alterações. | [pecas/modelo.md](pecas/modelo.md) |
+| `app/exportacao/exportar_bpmn.py` | Calcula as posições e escreve o arquivo `.bpmn`. | [pecas/exportar_bpmn.md](pecas/exportar_bpmn.md) |
 | `tests/` | Testes que rodam sem internet. | [pecas/testes.md](pecas/testes.md) |
 | `scripts/` | Utilitários para gerar, validar e renderizar diagramas. | [pecas/scripts.md](pecas/scripts.md) |
 
@@ -95,8 +155,9 @@ flowchart TB
 | | Desfazer |
 
 Se o desenho saiu errado, a pergunta para começar a investigar é: **a LLM pediu a operação
-errada, ou a operação certa fez a coisa errada?** O painel "Mostrar o que o agente fez" do
-app e a opção `--debug` do terminal mostram a lista de operações pedidas e respondem isso.
+errada, ou a operação certa fez a coisa errada?** O painel "Mostrar o que o agente fez" da
+página web e a opção `--debug` do terminal mostram a lista de operações pedidas e
+respondem isso.
 
 ## 4. O que acontece em um turno
 
@@ -104,12 +165,12 @@ app e a opção `--debug` do terminal mostram a lista de operações pedidas e r
 sequenceDiagram
     autonumber
     actor P as Pessoa
-    participant I as Interface<br/>(app.py ou cli.py)
-    participant S as Sessao<br/>(agente.py)
-    participant A as Nó agente
+    participant I as Interface<br/>(web.py ou terminal.py)
+    participant S as Sessao<br/>(sessao.py)
+    participant A as Nó agente<br/>(grafo.py)
     participant L as LLM
-    participant F as Nó ferramentas
-    participant M as ModeloProcesso
+    participant F as Nó ferramentas<br/>(grafo.py)
+    participant M as ModeloProcesso<br/>(dominio)
 
     P->>I: escreve uma mensagem
     I->>S: enviar(texto)
@@ -158,9 +219,9 @@ flowchart LR
         B["processo.bpmn<br/>o diagrama"]
         MD["processo.md<br/>descrição em texto"]
     end
-    MOD["ModeloProcesso"] --> J
-    MOD --> B
-    MOD --> MD
+    MOD["ModeloProcesso"] -- "persistencia.py" --> J
+    MOD -- "persistencia.py" --> B
+    MOD -- "persistencia.py" --> MD
     MOD --- D
 ```
 
@@ -174,28 +235,53 @@ flowchart LR
 | A chave de API | `.env` | Sim, e nunca vai para o git |
 
 Para continuar um processo depois de fechar o programa, carrega-se o `processo.json`
-(pelo app ou com `python cli.py --continuar <arquivo>`). O desenho volta inteiro; a
-conversa começa do zero, mas a LLM enxerga o processo todo pelo resumo.
+(pela página web ou com `python -m bpmn_agent.visao.terminal --continuar <arquivo>`). O
+desenho volta inteiro; a conversa começa do zero, mas a LLM enxerga o processo todo pelo
+resumo.
 
 ## 6. Como rodar
 
+Sempre a partir da raiz do projeto:
+
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env            # depois preencha o provedor e a chave
-.venv/bin/python -m pytest -q   # testes, sem internet
-.venv/bin/streamlit run app.py  # página web
-.venv/bin/python cli.py --debug # terminal, mostrando as operações
 ```
+
+```bash
+cp .env.example .env
+```
+
+Preencha o provedor e a chave no `.env`. Depois:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+```bash
+.venv/bin/streamlit run src/bpmn_agent/visao/web.py
+```
+
+```bash
+.venv/bin/python -m bpmn_agent.visao.terminal --debug
+```
+
+O `pip install -r requirements.txt` instala o próprio projeto em "modo editável": o Python
+passa a enxergar `src/bpmn_agent` de qualquer lugar, e mudanças no código valem na hora,
+sem reinstalar. As dependências estão listadas em `pyproject.toml`.
 
 ## 7. Por onde começar a mexer
 
 | Quero... | Mexa em... |
 |---|---|
-| Mudar o jeito de o agente falar ou perguntar | `prompt.py` |
-| Dar ao agente uma nova capacidade de edição | método em `modelo.py` + tool em `ferramentas.py` + teste |
-| Mudar a aparência ou a posição das coisas no desenho | `exportar_bpmn.py` (posições) ou `visualizador.py` (cores, zoom) |
-| Adicionar um provedor de LLM | `PROVEDORES` em `llm.py` |
-| Mudar o que o laço do agente faz (limites, tratamento de erro) | `agente.py` |
-| Mudar a tela | `app.py` |
+| Mudar o jeito de o agente falar ou perguntar | `app/agente/prompt.py` |
+| Dar ao agente uma nova capacidade de edição | método em `app/dominio/modelo.py` + tool em `app/agente/ferramentas.py` + teste |
+| Mudar o que conta como "ponto em aberto" | `app/dominio/analise.py` |
+| Mudar o texto que a LLM recebe sobre o processo | `app/dominio/textos.py` |
+| Mudar a posição das coisas no desenho | `app/exportacao/exportar_bpmn.py` |
+| Mudar cores, zoom ou destaque do desenho | `visao/visualizador.py` |
+| Adicionar um provedor de LLM | `PROVEDORES` em `app/agente/llm.py` |
+| Mudar o laço do agente (limites, tratamento de erro) | `app/agente/grafo.py` |
+| Mudar o que é gravado em disco | `app/persistencia.py` |
+| Mudar a tela | `visao/web.py` ou `visao/terminal.py` |
 
 Regras do projeto que valem para qualquer mudança estão em [CLAUDE.md](../CLAUDE.md).

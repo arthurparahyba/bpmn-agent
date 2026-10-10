@@ -1,20 +1,19 @@
-# `bpmn_agent/agente.py` — quem coordena o turno
+# `src/bpmn_agent/app/agente/grafo.py` — o laço de um turno
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
 ## Em uma frase
 
-Recebe a mensagem do usuário, faz a LLM e as tools trabalharem em laço até sair uma
-resposta em texto, e devolve o resultado para a interface.
+Faz a LLM e as tools trabalharem em laço até sair uma resposta em texto.
 
 ## Responsabilidade
 
 - Montar o grafo do LangGraph com dois nós (`construir_grafo`).
-- Representar uma conversa completa (`Sessao`): o processo, o histórico e os arquivos.
-- Entregar à interface o resultado de cada turno (`RespostaTurno`).
+- Cortar o histórico que vai para a LLM (`cortar_historico`).
+- Extrair o texto de uma mensagem (`texto_de`).
 
-Não contém regras de processo (isso é do [modelo](modelo.md)) nem texto de instruções
-(isso é do [prompt](prompt.md)).
+Não contém regras de processo (isso é do [domínio](modelo.md)), nem texto de instruções
+(isso é do [prompt](prompt.md)), nem a conversa em si (isso é da [`Sessao`](sessao.md)).
 
 ## O grafo
 
@@ -29,6 +28,9 @@ flowchart LR
 
 O que circula entre os nós é só a lista de mensagens da conversa (`MessagesState`). Cada
 nó devolve mensagens novas, que o LangGraph acrescenta ao fim da lista.
+
+`construir_grafo(llm, sessao, checkpointer)` recebe a LLM pronta e a sessão. Da sessão ele
+usa só duas coisas: `sessao.modelo` (o processo) e `sessao.salvar()`.
 
 ### Nó `agente`
 
@@ -79,51 +81,10 @@ pedido correspondente.
 Cortar é seguro porque o processo inteiro vai no resumo a cada chamada. O que se perde são
 só as falas antigas.
 
-## A classe `Sessao`
+### `texto_de`
 
-Uma `Sessao` = uma conversa = um processo.
-
-```mermaid
-flowchart TB
-    subgraph Sessao
-        ID["id<br/>8 caracteres aleatórios"]
-        MO["modelo<br/>ModeloProcesso"]
-        GR["grafo<br/>os dois nós"]
-        CK["checkpointer<br/>guarda as mensagens"]
-        PA["pasta<br/>sessoes/id/"]
-    end
-```
-
-| Método | O que faz |
-|---|---|
-| `__init__(llm, pasta, modelo, id)` | Cria o grafo e registra a saudação como primeira mensagem. Se veio um `modelo` já preenchido, a saudação é "Oi de novo! Carreguei o processo...". |
-| `enviar(texto)` | Roda um turno. Devolve `RespostaTurno`. |
-| `trocar_llm(llm)` | Refaz o grafo com outra LLM, mantendo o mesmo checkpointer: a conversa e o processo continuam. |
-| `mensagens()` | Todas as mensagens guardadas, incluindo pedidos e resultados de tools. |
-| `historico_visivel()` | Só as falas, como pares `(papel, texto)`. É o que a interface mostra. |
-| `bpmn_xml()` | O `.bpmn` do processo atual. |
-| `salvar()` | Grava `processo.json`, `processo.bpmn` e `processo.md` na pasta da sessão. |
-
-### `enviar` por dentro
-
-```mermaid
-flowchart TB
-    A["1. Tira uma 'foto' do processo<br/>(elementos e conexões)"] --> B["2. Roda o grafo com<br/>a mensagem do usuário"]
-    B --> C["3. Separa as mensagens novas<br/>deste turno"]
-    C --> D["4. acoes = resultados das tools"]
-    C --> E["5. texto = última fala da LLM"]
-    C --> F["6. alterados = o que mudou<br/>em relação à 'foto'"]
-    D --> G["RespostaTurno"]
-    E --> G
-    F --> G
-```
-
-- **`texto`**: a última fala da LLM com conteúdo. Se ela só chamou tools e não escreveu
-  nada, entra um texto padrão ("Pronto, atualizei o desenho. O que acontece em seguida?").
-- **`acoes`**: uma linha por tool executada, no formato `nome_da_tool: resultado`. É o que
-  o modo de depuração mostra.
-- **`alterados`**: ids de elementos novos ou modificados e de conexões novas. A interface
-  usa essa lista para destacar em verde o que mudou.
+Alguns provedores devolvem o conteúdo de uma mensagem como texto simples; outros, como uma
+lista de blocos. Esta função devolve sempre o texto, nos dois casos.
 
 ## Constantes
 
@@ -134,13 +95,13 @@ flowchart TB
 
 ## Quem usa e quem é usado
 
-- **Usado por**: `app.py`, `cli.py` e os testes.
-- **Usa**: `ferramentas.py` (para criar as tools), `prompt.py` (instruções e saudação),
-  `modelo.py`, `exportar_bpmn.py` e a LLM que recebe pronta de `llm.py`.
+- **Usado por**: `app/sessao.py` (que chama `construir_grafo`) e os testes.
+- **Usa**: `ferramentas.py` (para criar as tools), `prompt.py` (as instruções) e
+  `ErroModelo`, do domínio.
 
 ## Cuidados ao alterar
 
-- As tools recebem a `sessao` e buscam `sessao.modelo` a cada chamada, em vez de guardar
-  o modelo. Assim cada sessão mexe só no próprio processo, mesmo com várias no ar.
-- O checkpointer é o `MemorySaver`: a conversa some ao reiniciar o programa.
+- Este arquivo não pode importar `sessao.py`, `persistencia.py`, `exportacao` nem `visao`.
+  Ele recebe a sessão como parâmetro, sem conhecer a classe. É isso que evita uma
+  dependência circular com `sessao.py`.
 - Não há limite de erros seguidos de tool além do `LIMITE_PASSOS_GRAFO`.

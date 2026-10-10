@@ -1,4 +1,4 @@
-# `bpmn_agent/visualizador.py` — a página que desenha o diagrama
+# `src/bpmn_agent/visao/visualizador.py` — a página que desenha o diagrama
 
 [Visão geral](../README.md) · [Glossário](../glossario.md)
 
@@ -52,7 +52,7 @@ Para cada id da lista `destacar`, o script pede ao bpmn-js que marque o elemento
 classe `novo`. O estilo da página pinta de verde e engrossa o contorno de quem tem essa
 classe. Se um id não existir no desenho, é ignorado em silêncio.
 
-A lista vem de `RespostaTurno.alterados` (veja [agente.md](agente.md)): é assim que o
+A lista vem de `RespostaTurno.alterados` (veja [sessao.md](sessao.md)): é assim que o
 usuário percebe o que mudou depois de cada resposta.
 
 ## O sinal `window.__pronto`
@@ -64,8 +64,8 @@ O `scripts/renderizar.py` espera por esse sinal antes de tirar a foto da página
 
 | Quem | Como |
 |---|---|
-| `app.py` | Coloca a página dentro da tela do Streamlit, à direita do chat. |
-| `cli.py` | Grava a página em `sessoes/<id>/visualizar.html`, para abrir no navegador. |
+| `web.py` | Coloca a página dentro da tela do Streamlit, à direita do chat. |
+| `terminal.py` | Grava a página em `sessoes/<id>/visualizar.html`, para abrir no navegador. |
 | `scripts/renderizar.py` | Abre a página em um navegador controlado por código e salva um PNG, usando a cópia local do bpmn-js. |
 
 ## Cuidados ao alterar

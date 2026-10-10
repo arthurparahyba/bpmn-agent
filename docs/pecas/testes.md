@@ -28,8 +28,8 @@ flowchart LR
         A3["desfazer pelo agente"]
         A4["corte do histórico"]
     end
-    tm --> MOD["modelo.py<br/>exportar_bpmn.py"]
-    ta --> AG["agente.py<br/>ferramentas.py"]
+    tm --> MOD["dominio<br/>exportar_bpmn.py<br/>persistencia.py"]
+    ta --> AG["sessao.py<br/>grafo.py<br/>ferramentas.py"]
 ```
 
 ### `test_modelo.py`
@@ -81,8 +81,8 @@ tools consome pelo menos duas: a que pede as tools e a que responde em texto. Us
 
 | Não coberto | Como conferir hoje |
 |---|---|
-| O comportamento de uma LLM de verdade (tom, quantidade de perguntas, escolha das tools) | Conduzir uma conversa real pelo `cli.py --debug`. |
+| O comportamento de uma LLM de verdade (tom, quantidade de perguntas, escolha das tools) | Conduzir uma conversa real pelo `python -m bpmn_agent.visao.terminal --debug`. |
 | A conexão com cada provedor (`llm.py`) | Idem. |
 | A qualidade visual do layout | Gerar o PNG com `scripts/renderizar.py` e olhar. |
 | A validade do `.bpmn` segundo o leitor oficial | `node scripts/validar_bpmn.mjs <arquivo>`. |
-| A tela do Streamlit | Abrir o app e usar. |
+| A tela do Streamlit | Abrir a página web e usar. |
