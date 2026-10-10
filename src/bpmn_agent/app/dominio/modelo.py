@@ -1,87 +1,23 @@
 """
-Modelo de dados do processo e todas as operações de edição.
+ModeloProcesso: o processo e todas as operações de edição.
 
 O agente nunca escreve XML diretamente: ele chama operações de alto nível
 (adicionar passo, conectar, remover...) sobre este modelo, que é a fonte
-da verdade. O BPMN 2.0 é gerado a partir dele (ver exportar_bpmn.py).
+da verdade. O BPMN 2.0 é gerado a partir dele (ver exportacao/exportar_bpmn.py).
 
 Toda operação que altera o modelo salva um "snapshot" antes, o que permite
-desfazer quantas vezes for necessário.
+desfazer quantas vezes for necessário. As leituras (análise e textos) ficam em
+analise.py e textos.py; gravar em disco fica em app/persistencia.py.
 """
 from __future__ import annotations
 
 import copy
-import json
-import unicodedata
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import asdict
 
-# Tipos amigáveis (usados pelo agente) -> tipo BPMN
-TIPOS: dict[str, str] = {
-    "inicio": "startEvent",
-    "fim": "endEvent",
-    "tarefa": "task",
-    "tarefa_pessoa": "userTask",        # alguém faz usando um sistema/tela
-    "tarefa_sistema": "serviceTask",    # o sistema faz sozinho
-    "tarefa_manual": "manualTask",      # feita à mão, fora de sistema
-    "envio": "sendTask",                # enviar e-mail, mensagem, documento
-    "decisao": "exclusiveGateway",      # um caminho OU outro
-    "paralelo": "parallelGateway",      # vários caminhos ao mesmo tempo / junção
-    "espera": "intermediateCatchEvent", # aguardar prazo / data
-}
-TIPO_AMIGAVEL = {v: k for k, v in TIPOS.items()}
-ROTULO_LEGIVEL = {
-    "startEvent": "início", "endEvent": "fim", "task": "passo", "userTask": "feito por pessoa",
-    "serviceTask": "automático", "manualTask": "manual", "sendTask": "envio", "exclusiveGateway": "decisão",
-    "parallelGateway": "ao mesmo tempo", "intermediateCatchEvent": "espera",
-}
-GATEWAYS = {"exclusiveGateway", "parallelGateway"}
-# Não são trabalho de alguém: sem responsável próprio, ficam na raia de quem vem antes (ou depois).
-HERDAM_RAIA = GATEWAYS | {"startEvent", "endEvent", "intermediateCatchEvent"}
-
-PREFIXO = {
-    "startEvent": "Inicio", "endEvent": "Fim", "intermediateCatchEvent": "Espera",
-    "exclusiveGateway": "Decisao", "parallelGateway": "Paralelo",
-}
-
-
-class ErroModelo(ValueError):
-    """Erro com mensagem amigável, devolvida ao agente como resultado da ferramenta."""
-
-
-def _normalizar(texto: str) -> str:
-    texto = unicodedata.normalize("NFKD", texto or "")
-    texto = "".join(c for c in texto if not unicodedata.combining(c))
-    return " ".join(texto.lower().split())
-
-
-@dataclass
-class Elemento:
-    id: str
-    tipo: str                  # tipo BPMN (startEvent, task, ...)
-    nome: str
-    responsavel: str = ""      # nome do participante (raia); "" = sem raia
-    descricao: str = ""
-    regras: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Fluxo:
-    id: str
-    origem: str
-    destino: str
-    rotulo: str = ""
-
-
-@dataclass
-class Processo:
-    nome: str = "Novo processo"
-    descricao: str = ""
-    participantes: list[str] = field(default_factory=list)
-    elementos: dict[str, Elemento] = field(default_factory=dict)
-    fluxos: list[Fluxo] = field(default_factory=list)
-    pendencias: list[str] = field(default_factory=list)
-    contadores: dict[str, int] = field(default_factory=dict)
+from bpmn_agent.app.dominio import analise, textos
+from bpmn_agent.app.dominio.processo import (
+    GATEWAYS, PREFIXO, TIPOS, Elemento, ErroModelo, Fluxo, Processo, _normalizar,
+)
 
 
 class ModeloProcesso:
@@ -405,132 +341,24 @@ class ModeloProcesso:
         self.p = Processo()
         return "Diagrama apagado. Começando do zero (dá para desfazer)."
 
-    # --------------------------------------------------------- análise
+    # --------------------------------------------------------- leituras
     def problemas(self) -> list[str]:
         """Pontos em aberto, em linguagem simples, que o agente usa para guiar a entrevista."""
-        els = self.p.elementos
-        if not els:
-            return []
-        msgs = []
-        inicios = [e for e in els.values() if e.tipo == "startEvent"]
-        fins = [e for e in els.values() if e.tipo == "endEvent"]
-        if not inicios:
-            msgs.append("O processo ainda não tem início.")
-        if not fins:
-            msgs.append("Ainda não sabemos como o processo termina (nenhum fim).")
-        for e in els.values():
-            ent, sai = self.entradas(e.id), self.saidas(e.id)
-            if e.tipo != "startEvent" and not ent:
-                msgs.append(f"{e.id} '{e.nome}' não tem nada levando até ele.")
-            if e.tipo != "endEvent" and not sai:
-                msgs.append(f"{e.id} '{e.nome}': não sabemos o que acontece depois.")
-            if e.tipo == "exclusiveGateway" and len(sai) == 1 and len(ent) <= 1:
-                msgs.append(f"Decisão {e.id} '{e.nome}' só tem um caminho; falta a(s) outra(s) resposta(s).")
-            if e.tipo == "exclusiveGateway" and len(sai) > 1:
-                sem = [els[f.destino].nome for f in sai if not f.rotulo]
-                if sem:
-                    msgs.append(f"Decisão {e.id} '{e.nome}': caminhos sem resposta/condição indicada (para {sem}).")
-            if e.tipo not in GATEWAYS and e.tipo != "endEvent" and len(sai) > 1:
-                msgs.append(f"{e.id} '{e.nome}' tem várias saídas sem uma decisão; pode faltar uma decisão.")
-            if e.tipo not in HERDAM_RAIA and not e.responsavel and self.p.participantes:
-                msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
-        return msgs
+        return analise.problemas(self)
 
     def raia_de(self, elem_id: str) -> str:
-        """Participante em cuja raia o elemento é desenhado. Início, fim, decisão, paralelo e espera
-        sem responsável herdam o do passo mais próximo: primeiro olhando para trás, depois para frente."""
-        e = self.p.elementos[elem_id]
-        if e.responsavel or e.tipo not in HERDAM_RAIA:
-            return e.responsavel
-        para_tras = lambda i: [f.origem for f in self.entradas(i)]   # noqa: E731
-        para_frente = lambda i: [f.destino for f in self.saidas(i)]  # noqa: E731
-        for vizinhos in (para_tras, para_frente):
-            vistos, fila = {elem_id}, [elem_id]
-            while fila:
-                for v in vizinhos(fila.pop(0)):
-                    if v in vistos:
-                        continue
-                    if self.p.elementos[v].responsavel:
-                        return self.p.elementos[v].responsavel
-                    vistos.add(v)
-                    fila.append(v)
-        return ""
+        """Participante em cuja raia o elemento é desenhado."""
+        return analise.raia_de(self, elem_id)
 
     def resumo(self) -> str:
         """Representação textual compacta do diagrama, injetada no prompt a cada turno."""
-        p = self.p
-        if not p.elementos:
-            return (f"Processo: {p.nome}\n" + (f"Descrição: {p.descricao}\n" if p.descricao else "")
-                    + (f"Participantes: {', '.join(p.participantes)}\n" if p.participantes else "")
-                    + "Diagrama vazio.")
-        linhas = [f"Processo: {p.nome}"]
-        if p.descricao:
-            linhas.append(f"Descrição: {p.descricao}")
-        linhas.append(f"Participantes: {', '.join(p.participantes) or '(nenhum)'}")
-        linhas.append("Elementos:")
-        for e in p.elementos.values():
-            info = f"- {e.id} [{TIPO_AMIGAVEL.get(e.tipo, e.tipo)}] '{e.nome}'"
-            if e.responsavel:
-                info += f" | quem: {e.responsavel}"
-            if e.descricao:
-                info += f" | obs: {e.descricao}"
-            for i, r in enumerate(e.regras, 1):
-                info += f"\n    regra {i}: {r}"
-            linhas.append(info)
-        linhas.append("Conexões:")
-        for f in p.fluxos:
-            linhas.append(f"- {f.origem} -> {f.destino}" + (f" [{f.rotulo}]" if f.rotulo else ""))
-        probs = self.problemas()
-        if probs:
-            linhas.append("Pontos em aberto no diagrama:")
-            linhas += [f"- {m}" for m in probs]
-        if p.pendencias:
-            linhas.append("Pendências anotadas para perguntar depois:")
-            linhas += [f"{i}. {t}" for i, t in enumerate(p.pendencias, 1)]
-        return "\n".join(linhas)
+        return textos.resumo(self)
 
     def narrativa(self) -> str:
         """Descrição do fluxo em linguagem natural (para revisão com o usuário / documentação)."""
-        p = self.p
-        if not p.elementos:
-            return "O diagrama ainda está vazio."
-        nome = lambda i: p.elementos[i].nome  # noqa: E731
-        cab = [f"# {p.nome}"]
-        if p.descricao:
-            cab.append(p.descricao)
-        if p.participantes:
-            cab.append("**Participantes:** " + ", ".join(p.participantes))
-        partes = ["\n\n".join(cab), ""]
-        for n, e in enumerate(self._ordem_visita(), 1):
-            quem = f" — {e.responsavel}" if e.responsavel else ""
-            partes.append(f"{n}. **{e.nome}**{quem} _({ROTULO_LEGIVEL.get(e.tipo, e.tipo)})_")
-            if e.descricao:
-                partes.append(f"   - {e.descricao}")
-            for r in e.regras:
-                partes.append(f"   - Regra: {r}")
-            for f in self.saidas(e.id):
-                cond = f"se **{f.rotulo}**, " if f.rotulo else ""
-                partes.append(f"   - {cond}segue para: {nome(f.destino)}")
-        if p.pendencias:
-            partes.append("\n**Pendências:**")
-            partes += [f"- {t}" for t in p.pendencias]
-        return "\n".join(partes)
+        return textos.narrativa(self)
 
-    def _ordem_visita(self) -> list[Elemento]:
-        visitados, ordem = set(), []
-        fila = [e.id for e in self.p.elementos.values() if e.tipo == "startEvent"]
-        fila += [e.id for e in self.p.elementos.values() if not self.entradas(e.id) and e.id not in fila]
-        while fila:
-            i = fila.pop(0)
-            if i in visitados:
-                continue
-            visitados.add(i)
-            ordem.append(self.p.elementos[i])
-            fila += [f.destino for f in self.saidas(i)]
-        ordem += [e for e in self.p.elementos.values() if e.id not in visitados]
-        return ordem
-
-    # --------------------------------------------------------- persistência
+    # --------------------------------------------------------- conversão
     def para_dict(self) -> dict:
         return asdict(self.p)
 
@@ -546,12 +374,3 @@ class ModeloProcesso:
             contadores=dict(d.get("contadores", {})),
         )
         return cls(p)
-
-    def salvar(self, caminho: str | Path) -> None:
-        caminho = Path(caminho)
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        caminho.write_text(json.dumps(self.para_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-
-    @classmethod
-    def carregar(cls, caminho: str | Path) -> "ModeloProcesso":
-        return cls.de_dict(json.loads(Path(caminho).read_text(encoding="utf-8")))

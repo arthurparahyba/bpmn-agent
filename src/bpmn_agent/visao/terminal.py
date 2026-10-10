@@ -2,9 +2,9 @@
 Versão de terminal. A cada resposta, o diagrama é salvo em sessoes/<id>/ e
 `visualizar.html` é atualizado (abra no navegador e recarregue a página).
 
-    python cli.py                       # usa LLM_PROVEDOR do .env
-    python cli.py --provedor gemini
-    python cli.py --continuar sessoes/ab12cd34/processo.json
+    python -m bpmn_agent.visao.terminal                       # usa LLM_PROVEDOR do .env
+    python -m bpmn_agent.visao.terminal --provedor gemini
+    python -m bpmn_agent.visao.terminal --continuar sessoes/ab12cd34/processo.json
 
 Comandos: /desfazer  /resumo  /pendencias  /sair
 """
@@ -15,10 +15,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from bpmn_agent.agente import Sessao
-from bpmn_agent.llm import criar_llm
-from bpmn_agent.modelo import ModeloProcesso
-from bpmn_agent.visualizador import html_visualizador
+from bpmn_agent.app.agente.llm import criar_llm
+from bpmn_agent.app.persistencia import carregar_modelo
+from bpmn_agent.app.sessao import Sessao
+from bpmn_agent.visao.visualizador import html_visualizador
 
 
 def main() -> None:
@@ -30,7 +30,7 @@ def main() -> None:
     ap.add_argument("--debug", action="store_true", help="mostra as ações do agente")
     args = ap.parse_args()
 
-    modelo = ModeloProcesso.carregar(args.continuar) if args.continuar else None
+    modelo = carregar_modelo(args.continuar) if args.continuar else None
     sessao = Sessao(criar_llm(args.provedor, args.modelo), modelo=modelo)
     sessao.salvar()
     visual = sessao.pasta / "visualizar.html"

@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 
 from langchain_core.tools import BaseTool, tool
 
-from .modelo import ModeloProcesso
+from bpmn_agent.app.dominio import ModeloProcesso
 
 TipoElemento = Literal[
     "inicio", "fim", "tarefa", "tarefa_pessoa", "tarefa_sistema",

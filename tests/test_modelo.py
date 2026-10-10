@@ -2,8 +2,9 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from bpmn_agent.exportar_bpmn import gerar_bpmn_xml
-from bpmn_agent.modelo import ErroModelo, ModeloProcesso
+from bpmn_agent.app.dominio import ErroModelo, ModeloProcesso
+from bpmn_agent.app.exportacao.exportar_bpmn import gerar_bpmn_xml
+from bpmn_agent.app.persistencia import carregar_modelo, salvar_modelo
 
 NS = {"bpmn": "http://www.omg.org/spec/BPMN/20100524/MODEL"}
 
@@ -107,8 +108,8 @@ def test_xml_estrutura_e_persistencia(tmp_path):
     assert len(proc.findall("bpmn:laneSet/bpmn:lane", NS)) == 2
     doc = proc.find("bpmn:userTask[@id='Passo_2']/bpmn:documentation", NS).text
     assert "Prazo de 2 dias" in doc
-    m.salvar(tmp_path / "p.json")
-    m2 = ModeloProcesso.carregar(tmp_path / "p.json")
+    salvar_modelo(m, tmp_path / "p.json")
+    m2 = carregar_modelo(tmp_path / "p.json")
     assert gerar_bpmn_xml(m2) == gerar_bpmn_xml(m)
 
 

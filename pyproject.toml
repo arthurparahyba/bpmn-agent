@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bpmn-agent"
+version = "0.1.0"
+description = "Agente que entrevista uma pessoa sobre um processo de trabalho e desenha o BPMN"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-core>=1.6",
+    "langgraph>=1.2",
+    "langchain-openai>=1.7",          # DeepSeek, Groq, OpenRouter, Ollama (APIs compatíveis com OpenAI)
+    "langchain-anthropic>=1.7",       # Claude
+    "langchain-google-genai>=4.4",    # Gemini
+    "streamlit>=1.50",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]               # só para rodar os testes
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

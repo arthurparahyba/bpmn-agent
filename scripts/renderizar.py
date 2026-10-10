@@ -15,12 +15,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from playwright.sync_api import sync_playwright
+
+from bpmn_agent.visao.visualizador import html_visualizador
+
 RAIZ = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(RAIZ))
-
-from playwright.sync_api import sync_playwright  # noqa: E402
-
-from bpmn_agent.visualizador import html_visualizador  # noqa: E402
 
 DIST = RAIZ / "scripts" / "node_modules" / "bpmn-js" / "dist"
 

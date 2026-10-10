@@ -3,7 +3,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from bpmn_agent.agente import Sessao, cortar_historico
+from bpmn_agent.app.agente.grafo import cortar_historico
+from bpmn_agent.app.sessao import Sessao
 
 
 class LLMRoteirizado(BaseChatModel):

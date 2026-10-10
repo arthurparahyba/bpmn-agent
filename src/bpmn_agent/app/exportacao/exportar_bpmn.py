@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from .modelo import GATEWAYS, ModeloProcesso
+from bpmn_agent.app.dominio import GATEWAYS, ModeloProcesso
 
 NS = {
     "bpmn": "http://www.omg.org/spec/BPMN/20100524/MODEL",

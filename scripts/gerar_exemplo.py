@@ -9,10 +9,9 @@ Monta o processo de exemplo (reembolso) usando só as operações do modelo, sem
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from bpmn_agent.exportar_bpmn import gerar_bpmn_xml  # noqa: E402
-from bpmn_agent.modelo import ModeloProcesso  # noqa: E402
+from bpmn_agent.app.dominio import ModeloProcesso
+from bpmn_agent.app.exportacao.exportar_bpmn import gerar_bpmn_xml
+from bpmn_agent.app.persistencia import salvar_modelo
 
 m = ModeloProcesso()
 m.definir_processo("Reembolso de despesas", "Funcionário pede reembolso de despesas de viagem")
@@ -33,5 +32,5 @@ assert not m.problemas(), m.problemas()
 
 destino = Path(sys.argv[1] if len(sys.argv) > 1 else "exemplos/reembolso.bpmn")
 destino.write_text(gerar_bpmn_xml(m), encoding="utf-8")
-m.salvar(destino.with_suffix(".json"))
+salvar_modelo(m, destino.with_suffix(".json"))
 print(f"OK: {destino}")

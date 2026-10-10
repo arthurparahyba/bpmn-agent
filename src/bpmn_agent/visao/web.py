@@ -1,7 +1,7 @@
 """
 Interface web: chat à esquerda, diagrama BPMN ao vivo à direita.
 
-    streamlit run app.py
+    streamlit run src/bpmn_agent/visao/web.py
 """
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from bpmn_agent.agente import Sessao
-from bpmn_agent.llm import PROVEDORES, criar_llm
-from bpmn_agent.modelo import ModeloProcesso
-from bpmn_agent.visualizador import html_visualizador
+from bpmn_agent.app.agente.llm import PROVEDORES, criar_llm
+from bpmn_agent.app.dominio import ModeloProcesso
+from bpmn_agent.app.sessao import Sessao
+from bpmn_agent.visao.visualizador import html_visualizador
 
 load_dotenv()
 st.set_page_config(page_title="Desenhista de Processos", page_icon="🧭", layout="wide")

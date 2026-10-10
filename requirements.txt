@@ -1,8 +1,2 @@
-langchain-core>=1.6
-langgraph>=1.2
-langchain-openai>=1.7          # DeepSeek, Groq, OpenRouter, Ollama (APIs compatíveis com OpenAI)
-langchain-anthropic>=1.7       # Claude
-langchain-google-genai>=4.4    # Gemini
-streamlit>=1.50
-python-dotenv>=1.0
-pytest>=8                      # só para rodar os testes
+# As dependências ficam em pyproject.toml; isto instala o projeto em modo editável.
+-e .[dev]
