@@ -9,7 +9,9 @@ atual, decisões tomadas e próximos passos, e `docs/README.md` para a arquitetu
 ```bash
 pip install -r requirements.txt                       # instala o projeto em modo editável (pyproject.toml)
 python -m pytest -q                                   # testes (sem API; usam LLM roteirizada)
-python -m bpmn_agent.api.servidor                     # o serviço (lê o .env); deixe no ar
+./rodar.sh                                            # jeito simples: sobe o serviço + a página web (Ctrl+C encerra)
+./rodar.sh terminal                                   # idem, com a conversa no terminal
+python -m bpmn_agent.api.servidor                     # ou cada parte à mão: o serviço (lê o .env); deixe no ar
 streamlit run src/bpmn_agent/visao/web.py             # página web (outro terminal; precisa do serviço)
 python -m bpmn_agent.visao.terminal --debug           # ou a conversa no terminal (idem)
 python scripts/gerar_exemplo.py exemplos/reembolso.bpmn   # monta exemplo sem LLM

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "desenhista",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "NAO_ABRIR=1 ./rodar.sh"],
+      "port": 8501
+    }
+  ]
+}

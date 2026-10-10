@@ -15,7 +15,15 @@ cp .env.example .env          # escolha o provedor e coloque a chave
 python -m pytest              # testes (não usam API de LLM nem precisam do serviço)
 ```
 
-A visão e o backend são dois programas que conversam por HTTP. Em um terminal, suba o serviço:
+O jeito mais simples de usar é o script que sobe tudo e abre o navegador (`Ctrl+C` encerra):
+
+```bash
+./rodar.sh                # serviço + página web
+./rodar.sh terminal       # serviço + conversa no terminal
+```
+
+Por baixo, a visão e o backend são dois programas que conversam por HTTP. Para subir cada um
+à mão, em um terminal suba o serviço:
 
 ```bash
 python -m bpmn_agent.api.servidor             # http://127.0.0.1:8000 (rotas em /docs)

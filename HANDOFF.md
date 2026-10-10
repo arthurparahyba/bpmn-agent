@@ -187,6 +187,8 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
   use `kill $(pgrep -f "streamli[t] run")`.
 - O Streamlit roda o script inteiro a cada interação; em `st.session_state` fica só o id da sessão,
   e a cada execução a página pede o estado à API.
+- `./rodar.sh` sobe o serviço e a página web juntos (ou `./rodar.sh terminal`); `.claude/launch.json`
+  usa o mesmo script para o preview do Claude Code.
 - A API precisa estar no ar antes da página web ou do terminal. Nunca rode com `--workers` > 1
   (sessões em memória). Com `uvicorn --reload`, cada arquivo salvo reinicia as conversas.
 - Trocar de modelo = editar o `.env` e reiniciar o servidor.

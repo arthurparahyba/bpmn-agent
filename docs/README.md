@@ -302,7 +302,18 @@ Preencha o provedor e a chave no `.env`. Para rodar os testes (não precisam do 
 .venv/bin/python -m pytest -q
 ```
 
-Para usar, são **dois terminais**. No primeiro, o serviço, que fica no ar:
+Para usar, o jeito mais simples é o script que sobe o serviço e a página web juntos e abre
+o navegador. `Ctrl+C` encerra os dois:
+
+```bash
+./rodar.sh
+```
+
+Com `./rodar.sh terminal`, ele sobe o serviço e abre a conversa no terminal no lugar da
+página.
+
+O script só junta os dois comandos abaixo. Para subir cada parte à mão, são **dois
+terminais**. No primeiro, o serviço, que fica no ar:
 
 ```bash
 .venv/bin/python -m bpmn_agent.api.servidor
