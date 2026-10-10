@@ -117,3 +117,24 @@ def test_xml_sem_participantes_nao_cria_raias():
     m.adicionar_elemento("tarefa", "Fazer algo")
     raiz = ET.fromstring(gerar_bpmn_xml(m))
     assert raiz.find("bpmn:process/bpmn:laneSet", NS) is None
+
+
+def test_decisao_inicio_e_fim_sem_responsavel_herdam_a_raia():
+    m = ModeloProcesso()
+    m.adicionar_elemento("inicio", "Pedido recebido")
+    m.adicionar_elemento("tarefa_pessoa", "Analisar pedido", "Gestor", depois_de="Inicio_1")
+    m.adicionar_elemento("decisao", "Aprovado?", depois_de="Passo_1")
+    m.adicionar_elemento("tarefa_pessoa", "Pagar", "Financeiro", depois_de="Decisao_1", rotulo_conexao="Sim")
+    m.adicionar_elemento("fim", "Pago", depois_de="Passo_2")
+    m.adicionar_elemento("fim", "Recusado", depois_de="Decisao_1", rotulo_conexao="Não")
+    assert m.raia_de("Inicio_1") == "Gestor"       # sem ninguém antes: olha para frente
+    assert m.raia_de("Decisao_1") == "Gestor"
+    assert m.raia_de("Fim_1") == "Financeiro"
+    assert m.raia_de("Fim_2") == "Gestor"
+    assert m.problemas() == []
+    assert "(sem responsável)" not in gerar_bpmn_xml(m)
+
+    m.adicionar_elemento("tarefa", "Arquivar", depois_de="Passo_2")  # passo comum continua sendo cobrado
+    assert m.raia_de("Passo_3") == ""
+    assert any("sem responsável" in p for p in m.problemas())
+    assert "(sem responsável)" in gerar_bpmn_xml(m)

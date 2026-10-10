@@ -97,10 +97,10 @@ def calcular_layout(m: ModeloProcesso) -> dict:
 
     # 3) raias
     raias = list(p.participantes)
-    if raias and any(not p.elementos[i].responsavel for i in ids):
-        raias.append("")  # raia "sem responsável"
     usar_raias = bool(raias)
-    raia_de = {i: (p.elementos[i].responsavel if usar_raias else "") for i in ids}
+    raia_de = {i: (m.raia_de(i) if usar_raias else "") for i in ids}
+    if usar_raias and any(not r for r in raia_de.values()):
+        raias.append("")  # raia "sem responsável"
     if not usar_raias:
         raias = [""]
 

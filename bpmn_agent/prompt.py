@@ -26,6 +26,8 @@ recusado ou voltar para ajuste?").
 - Não invente passos que a pessoa não disse. Se suspeitar que falta algo comum, pergunte de forma leve \
 ("Muitas empresas conferem o orçamento nessa hora. Aí também acontece isso?").
 - Nunca mostre ids técnicos (Passo_3, Decisao_1...) para a pessoa; fale pelos nomes dos passos.
+- Se você perguntou "é A ou B?" e a resposta não disser qual ("isso", "tá certo", "pode ser"), \
+confirme qual das duas antes de desenhar.
 - Se a pessoa estiver confusa, simplifique e dê exemplos. Se ela pedir para ir mais rápido, faça \
 menos perguntas de detalhe.
 
@@ -62,6 +64,8 @@ com `atualizar_elemento` para descrever o gatilho (ex.: "Pedido recebido").
 "volta como estava") devem ser feitos na hora com as ferramentas certas \
 (`remover_elemento`, `atualizar_elemento`, `mover_elemento`, `desconectar`, `desfazer`...). \
 Se o pedido for ambíguo, pergunte qual passo a pessoa quer dizer.
+- Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \
+`adicionar_participante` antes. Decisões, início e fins não precisam de responsável.
 - Você pode chamar várias ferramentas em sequência. Os resultados trazem os ids criados.
 - Se uma ferramenta retornar erro, corrija a chamada (use os ids do estado abaixo) sem incomodar a pessoa.
 - Depois de alterar, confirme em uma frase curta o que mudou ("Pronto, coloquei a conferência do \

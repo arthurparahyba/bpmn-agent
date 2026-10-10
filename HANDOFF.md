@@ -23,15 +23,26 @@ diagrama BPMN aos poucos. Requisitos originais do dono do projeto:
 | Modelo do processo + 17 operações + desfazer + validação | `bpmn_agent/modelo.py` | ✅ testado |
 | Exportação BPMN 2.0 com DI e layout automático | `bpmn_agent/exportar_bpmn.py` | ✅ 0 avisos no bpmn-moddle, conferido visualmente |
 | 17 tools para o LLM | `bpmn_agent/ferramentas.py` | ✅ esquemas aceitos por OpenAI-compat, Anthropic e Gemini |
-| Prompt de entrevista + saudação | `bpmn_agent/prompt.py` | ⚠️ **nunca testado com LLM real** |
+| Prompt de entrevista + saudação | `bpmn_agent/prompt.py` | ✅ testado em conversa real com `claude-haiku-5-5` |
 | Grafo LangGraph + `Sessao` | `bpmn_agent/agente.py` | ✅ testado com LLM roteirizada |
-| Fábrica de LLMs (6 provedores) | `bpmn_agent/llm.py` | ⚠️ instancia e faz `bind_tools`, mas sem chamada real |
+| Fábrica de LLMs (6 provedores) | `bpmn_agent/llm.py` | ✅ Anthropic testado de verdade; ⚠️ os outros 5 só instanciam |
 | App Streamlit (chat + diagrama ao vivo) | `app.py` | ✅ testado no navegador headless com LLM roteirizada |
 | CLI | `cli.py` | ⚠️ não executado |
-| Testes | `tests/` | ✅ 14 passando |
+| Testes | `tests/` | ✅ 15 passando |
+| Documentação para desenvolvedores | `docs/`, `PASSO_A_PASSO.md` | ✅ visão geral, uma página por peça, glossário e conversa real comentada |
 
-**Ainda não houve nenhuma conversa com uma LLM de verdade** (o ambiente original não tinha chave
-nem acesso de rede às APIs). Esse é o primeiro passo — ver seção 6.
+**Primeira conversa real feita em 10/10/2026** com Anthropic (`claude-haiku-5-5`), roteiro do
+reembolso com pedidos de alteração no meio: uma pergunta por vez, sem jargão, nenhuma tool com
+erro, 3 a 12 s por turno. Ajustes que saíram dela:
+
+- `llm.py`: Anthropic sem `temperature` (os modelos Claude 5 devolvem 400 com o parâmetro).
+- `modelo.py`: `raia_de()` — início, fim, decisão, paralelo e espera sem responsável herdam a raia
+  do passo vizinho e não contam mais como ponto em aberto. Antes iam todos para uma raia
+  "(sem responsável)" e a lista de pontos em aberto nunca esvaziava.
+- `prompt.py`: não chamar `adicionar_participante` antes de usar `responsavel`; confirmar quando
+  a resposta a "A ou B?" for ambígua.
+
+DeepSeek, Gemini, Groq, OpenRouter e Ollama continuam sem teste real.
 
 ## 3. Arquitetura
 
@@ -109,6 +120,7 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
 - **Gemini via `langchain-google-genai` nativo**, não pelo endpoint compatível com OpenAI: Gemini 3
   exige devolver "thought signatures" entre chamadas de ferramentas.
 - **Gemini sem `temperature`** (o Google recomenda o padrão 1.0 nos modelos 3.x).
+- **Anthropic sem `temperature`**: a API recusa o parâmetro nos modelos Claude 5.
 
 ## 5. Pesquisa de LLMs (outubro/2026 — reconferir antes de mudar padrões)
 
@@ -123,7 +135,7 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
 
 ## 6. Próximos passos (em ordem de prioridade)
 
-1. **Primeira conversa real.** Criar `.env`, rodar `python cli.py --debug` com DeepSeek e com
+1. **Conversa real nos outros provedores** (feita só com Anthropic). Rodar `python cli.py --debug` com DeepSeek e com
    Gemini; conduzir o exemplo do reembolso e anotar: o agente faz 1 pergunta por vez? usa jargão?
    chama as tools certas? sobra ponta solta? Ajustar `prompt.py` com base nisso.
 2. **Suíte de avaliação com LLM real** (`tests/avaliacao/`, marcada para não rodar no CI):

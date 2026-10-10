@@ -36,6 +36,8 @@ ROTULO_LEGIVEL = {
     "parallelGateway": "ao mesmo tempo", "intermediateCatchEvent": "espera",
 }
 GATEWAYS = {"exclusiveGateway", "parallelGateway"}
+# Não são trabalho de alguém: sem responsável próprio, ficam na raia de quem vem antes (ou depois).
+HERDAM_RAIA = GATEWAYS | {"startEvent", "endEvent", "intermediateCatchEvent"}
 
 PREFIXO = {
     "startEvent": "Inicio", "endEvent": "Fim", "intermediateCatchEvent": "Espera",
@@ -430,9 +432,29 @@ class ModeloProcesso:
                     msgs.append(f"Decisão {e.id} '{e.nome}': caminhos sem resposta/condição indicada (para {sem}).")
             if e.tipo not in GATEWAYS and e.tipo != "endEvent" and len(sai) > 1:
                 msgs.append(f"{e.id} '{e.nome}' tem várias saídas sem uma decisão; pode faltar uma decisão.")
-            if e.tipo not in {"startEvent", "endEvent"} and not e.responsavel and self.p.participantes:
+            if e.tipo not in HERDAM_RAIA and not e.responsavel and self.p.participantes:
                 msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
         return msgs
+
+    def raia_de(self, elem_id: str) -> str:
+        """Participante em cuja raia o elemento é desenhado. Início, fim, decisão, paralelo e espera
+        sem responsável herdam o do passo mais próximo: primeiro olhando para trás, depois para frente."""
+        e = self.p.elementos[elem_id]
+        if e.responsavel or e.tipo not in HERDAM_RAIA:
+            return e.responsavel
+        para_tras = lambda i: [f.origem for f in self.entradas(i)]   # noqa: E731
+        para_frente = lambda i: [f.destino for f in self.saidas(i)]  # noqa: E731
+        for vizinhos in (para_tras, para_frente):
+            vistos, fila = {elem_id}, [elem_id]
+            while fila:
+                for v in vizinhos(fila.pop(0)):
+                    if v in vistos:
+                        continue
+                    if self.p.elementos[v].responsavel:
+                        return self.p.elementos[v].responsavel
+                    vistos.add(v)
+                    fila.append(v)
+        return ""
 
     def resumo(self) -> str:
         """Representação textual compacta do diagrama, injetada no prompt a cada turno."""

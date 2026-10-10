@@ -68,7 +68,8 @@ def criar_llm(provedor: str | None = None, modelo: str | None = None,
 
     if provedor == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=modelo, api_key=chave, temperature=temperatura, max_tokens=2048, max_retries=3)
+        # Sem `temperature`: os modelos Claude 5 recusam o parâmetro (400 "temperature is deprecated").
+        return ChatAnthropic(model=modelo, api_key=chave, max_tokens=2048, max_retries=3)
 
     if provedor == "gemini":
         # Integração nativa: preserva as "thought signatures" que o Gemini exige entre chamadas de ferramentas.
