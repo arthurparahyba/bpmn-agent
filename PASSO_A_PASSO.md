@@ -13,9 +13,11 @@ Tudo aqui foi gravado de uma conversa feita em 10/10/2026 com o modelo `claude-h
 (sessão `e1232735`): pedidos de tool, resultados, JSON, imagens e respostas são os que
 aconteceram, sem edição. Inclusive um erro da LLM na mensagem 2, que ela mesma corrigiu.
 
-A conversa foi conduzida por um script que chama `Sessao.enviar()` diretamente. Os
-diagramas mostram a página web (`web.py`) como interface; pelo terminal (`terminal.py`) o
-caminho é idêntico, porque as duas interfaces só fazem chamar a `Sessao`.
+**Sobre a gravação.** A conversa foi gravada chamando `Sessao.enviar()` diretamente, por
+um script. Tudo o que acontece da `Sessao` para dentro (LLM, tools, JSON, desenho) é o
+que foi gravado. O trecho entre a página web e a `Sessao` (o `cliente.py` e a API) é
+mostrado como a aplicação funciona hoje; ele só transporta o texto e a resposta, sem
+mudar nada do conteúdo. Pelo terminal (`terminal.py`) o caminho é idêntico.
 
 Uma LLM não responde sempre igual. Se você repetir a conversa, os nomes dos passos e a
 divisão em voltas podem mudar. O que **não** muda é o caminho que cada mensagem percorre,
@@ -31,7 +33,9 @@ Termos técnicos estão no [glossário](docs/glossario.md). A visão geral está
 ```mermaid
 flowchart TB
     P(["Pessoa escreve"]) --> W["<b>visao/web.py</b><br/>recebe o texto"]
-    W --> S["<b>app/sessao.py</b> · Sessao.enviar()<br/>tira uma 'foto' do processo e roda o grafo"]
+    W --> C["<b>visao/cliente.py</b><br/>monta o pedido HTTP"]
+    C == "HTTP: POST /sessoes/id/mensagens<br/>(de um processo para o outro)" ==> RT["<b>api/rotas.py</b><br/>valida, acha a sessão e pega a trava"]
+    RT --> S["<b>app/sessao.py</b> · Sessao.enviar()<br/>tira uma 'foto' do processo e roda o grafo"]
     S --> A["<b>app/agente/grafo.py</b> · nó agente<br/>monta o pacote e chama a LLM"]
     A --> L{{"LLM"}}
     L --> Q{"pediu tools?"}
@@ -41,9 +45,13 @@ flowchart TB
     M --> D["<b>app/persistencia.py</b><br/>grava json, bpmn e md"]
     D -- "nova volta:<br/>a LLM vê o resultado" --> A
     Q -- "não: respondeu em texto" --> R["<b>Sessao</b> monta o RespostaTurno<br/>texto + ações + o que mudou"]
-    R --> V["<b>visao/web.py</b><br/>mostra a resposta e redesenha"]
-    V --> X["<b>exportar_bpmn.py + visualizador.py</b><br/>calculam posições e desenham"]
+    R == "HTTP: resposta em JSON" ==> V["<b>visao/web.py</b><br/>recebe a resposta e pede o estado<br/>(GET /sessoes/id)"]
+    V --> X["<b>visualizador.py</b><br/>desenha o XML que veio no estado"]
 ```
+
+A página web (ou o terminal) e o serviço são **dois programas separados**. As setas
+grossas são os únicos pontos em que eles se falam, sempre por HTTP. O XML do desenho é
+gerado no serviço (`exportar_bpmn.py`) e viaja dentro do estado; a visão só o desenha.
 
 Cada passagem pelo trecho `nó agente → LLM → nó ferramentas` é uma **volta**. Um turno
 tem no mínimo uma volta (a LLM responde direto) e normalmente duas ou mais.
@@ -89,9 +97,13 @@ A LLM **não executa nada**. Ela devolve texto, ou devolve pedidos do tipo "cham
 
 ### O ponto de partida
 
-A pessoa abre a página web. Nenhuma LLM é chamada: `web.py` lê o `.env`, `llm.py` cria a
-conexão com o provedor, e `Sessao` nasce com um processo vazio e a saudação (texto fixo de
-`prompt.py`) como primeira mensagem.
+O serviço já está no ar: ao subir, `api/servidor.py` leu o `.env` com o provedor, o modelo
+e a chave.
+
+A pessoa abre a página web. `web.py` pede uma conversa nova (`POST /sessoes`). No serviço,
+`llm.py` cria a conexão com o provedor e uma `Sessao` nasce com um processo vazio e a
+saudação (texto fixo de `prompt.py`) como primeira mensagem. Nenhuma LLM é chamada ainda.
+A página recebe de volta o id da sessão e o estado, e mostra a saudação.
 
 > Oi! 👋 Vou te ajudar a desenhar um processo de trabalho, passo a passo. [...]
 > Pra começar: **qual processo você quer documentar?**
@@ -119,6 +131,8 @@ sequenceDiagram
     autonumber
     actor P as Pessoa
     participant W as web.py
+    participant C as cliente.py
+    participant R as API (rotas.py)
     participant S as Sessao
     participant A as Nó agente
     participant L as LLM (Claude)
@@ -126,7 +140,9 @@ sequenceDiagram
     participant M as ModeloProcesso
     participant D as persistencia.py
     P->>W: "reembolso de despesas de viagem"
-    W->>S: enviar(texto)
+    W->>C: enviar(id, texto)
+    C->>R: POST /sessoes/id/mensagens
+    R->>S: enviar(texto)
     S->>A: roda o grafo
     Note over A,L: volta 1
     A->>M: resumo()
@@ -144,7 +160,12 @@ sequenceDiagram
     A->>L: instruções + estado + 5 mensagens + 17 tools
     L-->>A: só texto (a resposta)
     A-->>S: fim do grafo
-    S-->>W: RespostaTurno
+    S-->>R: RespostaTurno
+    R-->>C: JSON com texto, acoes, alterados
+    C-->>W: dicionário
+    W->>C: estado(id)
+    C->>R: GET /sessoes/id
+    R-->>W: estado (histórico, descrição, XML)
     W-->>P: resposta + desenho atualizado
 ```
 
@@ -226,6 +247,8 @@ sequenceDiagram
     autonumber
     actor P as Pessoa
     participant W as web.py
+    participant C as cliente.py
+    participant R as API (rotas.py)
     participant S as Sessao
     participant A as Nó agente
     participant L as LLM (Claude)
@@ -233,7 +256,9 @@ sequenceDiagram
     participant M as ModeloProcesso
     participant D as persistencia.py
     P->>W: "o funcionário preenche um formulário e anexa as notas"
-    W->>S: enviar(texto)
+    W->>C: enviar(id, texto)
+    C->>R: POST /sessoes/id/mensagens
+    R->>S: enviar(texto)
     S->>A: roda o grafo
     Note over A,L: volta 1
     A->>M: resumo()
@@ -273,7 +298,12 @@ sequenceDiagram
     A->>L: instruções + estado + 14 mensagens + 17 tools
     L-->>A: só texto (a resposta)
     A-->>S: fim do grafo
-    S-->>W: RespostaTurno
+    S-->>R: RespostaTurno
+    R-->>C: JSON com texto, acoes, alterados
+    C-->>W: dicionário
+    W->>C: estado(id)
+    C->>R: GET /sessoes/id
+    R-->>W: estado (histórico, descrição, XML)
     W-->>P: resposta + desenho atualizado
 ```
 
@@ -410,6 +440,8 @@ sequenceDiagram
     autonumber
     actor P as Pessoa
     participant W as web.py
+    participant C as cliente.py
+    participant R as API (rotas.py)
     participant S as Sessao
     participant A as Nó agente
     participant L as LLM (Claude)
@@ -417,7 +449,9 @@ sequenceDiagram
     participant M as ModeloProcesso
     participant D as persistencia.py
     P->>W: "aí o gestor dele analisa. se aprovar vai pro financeiro pag…"
-    W->>S: enviar(texto)
+    W->>C: enviar(id, texto)
+    C->>R: POST /sessoes/id/mensagens
+    R->>S: enviar(texto)
     S->>A: roda o grafo
     Note over A,L: volta 1
     A->>M: resumo()
@@ -469,7 +503,12 @@ sequenceDiagram
     A->>L: instruções + estado + 26 mensagens + 17 tools
     L-->>A: só texto (a resposta)
     A-->>S: fim do grafo
-    S-->>W: RespostaTurno
+    S-->>R: RespostaTurno
+    R-->>C: JSON com texto, acoes, alterados
+    C-->>W: dicionário
+    W->>C: estado(id)
+    C->>R: GET /sessoes/id
+    R-->>W: estado (histórico, descrição, XML)
     W-->>P: resposta + desenho atualizado
 ```
 
@@ -711,6 +750,8 @@ sequenceDiagram
     autonumber
     actor P as Pessoa
     participant W as web.py
+    participant C as cliente.py
+    participant R as API (rotas.py)
     participant S as Sessao
     participant A as Nó agente
     participant L as LLM (Claude)
@@ -718,7 +759,9 @@ sequenceDiagram
     participant M as ModeloProcesso
     participant D as persistencia.py
     P->>W: "depois que o financeiro paga acabou. o pagamento tem que sa…"
-    W->>S: enviar(texto)
+    W->>C: enviar(id, texto)
+    C->>R: POST /sessoes/id/mensagens
+    R->>S: enviar(texto)
     S->>A: roda o grafo
     Note over A,L: volta 1
     A->>M: resumo()
@@ -736,7 +779,12 @@ sequenceDiagram
     A->>L: instruções + estado + 30 mensagens + 17 tools
     L-->>A: só texto (a resposta)
     A-->>S: fim do grafo
-    S-->>W: RespostaTurno
+    S-->>R: RespostaTurno
+    R-->>C: JSON com texto, acoes, alterados
+    C-->>W: dicionário
+    W->>C: estado(id)
+    C->>R: GET /sessoes/id
+    R-->>W: estado (histórico, descrição, XML)
     W-->>P: resposta + desenho atualizado
 ```
 
@@ -955,6 +1003,8 @@ sequenceDiagram
     autonumber
     actor P as Pessoa
     participant W as web.py
+    participant C as cliente.py
+    participant R as API (rotas.py)
     participant S as Sessao
     participant A as Nó agente
     participant L as LLM (Claude)
@@ -962,7 +1012,9 @@ sequenceDiagram
     participant M as ModeloProcesso
     participant D as persistencia.py
     P->>W: "esqueci: antes de pagar o financeiro confere as notas"
-    W->>S: enviar(texto)
+    W->>C: enviar(id, texto)
+    C->>R: POST /sessoes/id/mensagens
+    R->>S: enviar(texto)
     S->>A: roda o grafo
     Note over A,L: volta 1
     A->>M: resumo()
@@ -992,7 +1044,12 @@ sequenceDiagram
     A->>L: instruções + estado + 37 mensagens + 17 tools
     L-->>A: só texto (a resposta)
     A-->>S: fim do grafo
-    S-->>W: RespostaTurno
+    S-->>R: RespostaTurno
+    R-->>C: JSON com texto, acoes, alterados
+    C-->>W: dicionário
+    W->>C: estado(id)
+    C->>R: GET /sessoes/id
+    R-->>W: estado (histórico, descrição, XML)
     W-->>P: resposta + desenho atualizado
 ```
 
@@ -1256,25 +1313,35 @@ metade. O único freio é o limite de 60 passos do grafo por turno (`LIMITE_PASS
 
 ## O que levar deste passo a passo
 
-1. **Toda alteração passa pelo mesmo funil:** LLM pede ➜ nó `ferramentas` executa ➜ tool
+1. **A visão e o backend são dois programas.** A página só envia texto e recebe JSON; não
+   conhece o modelo, as tools nem a LLM.
+2. **Toda alteração passa pelo mesmo funil:** LLM pede ➜ nó `ferramentas` executa ➜ tool
    repassa ➜ modelo valida, copia e altera ➜ persistência grava.
-2. **Só o nó `agente` fala com a LLM**, e sempre com o mesmo pacote: instruções, estado
+3. **Só o nó `agente` fala com a LLM**, e sempre com o mesmo pacote: instruções, estado
    atual, conversa e tools.
-3. **A LLM enxerga o processo pelo estado**, refeito a cada volta. É por ele que ela
+4. **A LLM enxerga o processo pelo estado**, refeito a cada volta. É por ele que ela
    conhece os ids, sabe o que falta e percebe o efeito do que acabou de fazer.
-4. **O JSON é a fonte da verdade.** O desenho, o `.bpmn` e a descrição em texto são
+5. **O JSON é a fonte da verdade.** O desenho, o `.bpmn` e a descrição em texto são
    sempre gerados a partir dele.
-5. **O desenho é recalculado do zero** a cada alteração. Ninguém "move" caixas.
-6. **Para investigar um resultado estranho**, ligue a depuração (`--debug` no terminal ou
+6. **O desenho é recalculado do zero** a cada alteração. Ninguém "move" caixas.
+7. **Para investigar um resultado estranho**, ligue a depuração (`--debug` no terminal ou
    "Mostrar o que o agente fez" na página web) e veja a lista de tools: o problema está no
    pedido da LLM ou no que o modelo fez com ele.
 
 ## Como reproduzir
 
+Em um terminal, o serviço:
+
+```bash
+.venv/bin/python -m bpmn_agent.api.servidor
+```
+
+Em outro, a conversa:
+
 ```bash
 .venv/bin/python -m bpmn_agent.visao.terminal --debug
 ```
 
-Digite as cinco mensagens acima. Os arquivos de cada sessão ficam em `sessoes/<id>/`, e
-`visualizar.html` nessa pasta mostra o desenho (recarregue a página depois de cada
-resposta).
+Digite as cinco mensagens acima. Os arquivos de cada sessão ficam em `sessoes/<id>/`. O
+terminal imprime o endereço de um `visualizar.html` que mostra o desenho (recarregue a
+página depois de cada resposta).

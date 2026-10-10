@@ -4,8 +4,8 @@
 
 ## Em uma frase
 
-`Sessao` é a porta de entrada do backend: a interface entrega o texto do usuário e recebe
-a resposta pronta. `persistencia.py` é o único lugar do backend que grava e lê arquivos.
+`Sessao` é uma conversa completa: a [API](api.md) entrega o texto do usuário e recebe a
+resposta pronta. `persistencia.py` é o único lugar do backend que grava e lê arquivos.
 
 ## Responsabilidade
 
@@ -19,7 +19,7 @@ outras partes do backend:
 
 ```mermaid
 flowchart TB
-    V["visao<br/>web.py / terminal.py"] --> S["Sessao"]
+    V["api<br/>rotas.py"] --> S["Sessao"]
     S --> G["agente/grafo.py<br/>roda o turno"]
     S --> M["dominio<br/>guarda o processo"]
     S --> E["exportacao<br/>gera o .bpmn"]
@@ -45,7 +45,7 @@ flowchart TB
 |---|---|
 | `__init__(llm, pasta, modelo, id)` | Cria o grafo e registra a saudação como primeira mensagem. Se veio um `modelo` já preenchido, a saudação é "Oi de novo! Carreguei o processo...". |
 | `enviar(texto)` | Roda um turno. Devolve `RespostaTurno`. |
-| `trocar_llm(llm)` | Refaz o grafo com outra LLM, mantendo o mesmo checkpointer: a conversa e o processo continuam. |
+| `desfazer()` | Desfaz a última alteração do processo, sem passar pela LLM, e regrava os arquivos. |
 | `mensagens()` | Todas as mensagens guardadas, incluindo pedidos e resultados de tools. |
 | `historico_visivel()` | Só as falas, como pares `(papel, texto)`. É o que a interface mostra. |
 | `bpmn_xml()` | O `.bpmn` do processo atual. |
@@ -100,17 +100,18 @@ O domínio não sabe gravar a si mesmo: `ModeloProcesso` só converte para dicio
 
 ## Quem usa e quem é usado
 
-- **Usado por**: `visao/web.py`, `visao/terminal.py`, `scripts/gerar_exemplo.py` e os
-  testes.
+- **Usado por**: `api/rotas.py` e `api/registro.py` (que cria e guarda as sessões),
+  `scripts/gerar_exemplo.py` (só a persistência) e os testes.
 - **`sessao.py` usa**: `agente/grafo.py`, `agente/prompt.py` (a saudação), `dominio`,
   `exportacao` e `persistencia.py`.
 - **`persistencia.py` usa**: `dominio` e `exportacao`.
 
 ## Cuidados ao alterar
 
-- A `Sessao` não pode importar nada de `visao`.
-- A pasta padrão (`sessoes`) é relativa à pasta de onde o programa foi iniciado. Rode os
-  comandos sempre da raiz do projeto.
+- A `Sessao` não pode importar nada de `api` nem de `visao`.
+- A pasta padrão (`sessoes`) é relativa à pasta de onde o servidor foi iniciado. Suba o
+  servidor sempre da raiz do projeto.
+- A LLM é a mesma do começo ao fim da sessão: vem do `.env` do servidor.
 - O checkpointer é o `MemorySaver`: a conversa some ao reiniciar o programa.
 - As tools recebem a `sessao` e buscam `sessao.modelo` a cada chamada, em vez de guardar
   o modelo. Assim cada sessão mexe só no próprio processo, mesmo com várias no ar.

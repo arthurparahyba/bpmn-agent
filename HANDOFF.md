@@ -27,9 +27,11 @@ diagrama BPMN aos poucos. Requisitos originais do dono do projeto:
 | Grafo LangGraph | `app/agente/grafo.py` | ✅ testado com LLM roteirizada |
 | `Sessao` + gravação em disco | `app/sessao.py`, `app/persistencia.py` | ✅ testado com LLM roteirizada |
 | Fábrica de LLMs (6 provedores) | `src/bpmn_agent/app/agente/llm.py` | ✅ Anthropic testado de verdade; ⚠️ os outros 5 só instanciam |
-| App Streamlit (chat + diagrama ao vivo) | `web.py` | ✅ testado no navegador headless com LLM roteirizada |
-| CLI | `terminal.py` | ⚠️ não executado |
-| Testes | `tests/` | ✅ 15 passando |
+| Página web (chat + diagrama ao vivo) | `visao/web.py` | ✅ carga, um turno real e serviço desligado conferidos pelo AppTest do Streamlit; ⚠️ não conferida a olho no navegador depois da API |
+| Terminal | `visao/terminal.py` | ✅ conversa real contra o servidor |
+| API HTTP (rotas, esquemas, registro de sessões) | `api/` | ✅ testada com TestClient e com servidor real |
+| Cliente HTTP da visão | `visao/cliente.py` | ✅ testado contra a API em memória |
+| Testes | `tests/` | ✅ 37 passando (modelo, agente, API, cliente, regras de camada) |
 | Documentação para desenvolvedores | `docs/`, `PASSO_A_PASSO.md` | ✅ visão geral, uma página por peça, glossário e conversa real comentada |
 
 **Primeira conversa real feita em 10/10/2026** com Anthropic (`claude-haiku-5-5`), roteiro do
@@ -47,12 +49,13 @@ DeepSeek, Gemini, Groq, OpenRouter e Ollama continuam sem teste real.
 
 ## 3. Arquitetura
 
-Refatorado em 10/10/2026 para `src/bpmn_agent/{app,visao}` (backend e visão separados; caminhos
-abaixo são relativos a `src/bpmn_agent/`). Estrutura, regras de camada e diagramas em
+Refatorado em 10/10/2026 para `src/bpmn_agent/{app,api,visao}`. A visão (página web e terminal)
+é um cliente HTTP; o backend é um serviço FastAPI (`python -m bpmn_agent.api.servidor`). Caminhos
+abaixo são relativos a `src/bpmn_agent/`. Estrutura, regras de camada e diagramas em
 `docs/README.md`; uma página por peça em `docs/pecas/`.
 
 ```
-visao/web.py / visao/terminal.py
+visao/web.py / visao/terminal.py ── visao/cliente.py ══ HTTP ══► api/rotas.py ── api/registro.py
    └── Sessao (app/sessao.py) ── modelo: ModeloProcesso ── salvar() → persistencia → sessoes/<id>/{json,bpmn,md}
          └── grafo LangGraph (MessagesState, MemorySaver, thread_id = sessao.id)
 
@@ -70,8 +73,10 @@ START → agente ──(tool_calls?)──► ferramentas ──► agente ─�
   corrigir, e chama `sessao.salvar()`.
 - **`Sessao.enviar(texto)`** → `RespostaTurno(texto, acoes, alterados)`. `alterados` = ids de
   elementos/fluxos novos ou modificados no turno (o visualizador destaca em verde).
-- **`Sessao.trocar_llm(llm)`**: reconstrói o grafo com o mesmo checkpointer → troca de modelo sem
-  perder conversa.
+- **`Sessao.desfazer()`**: desfaz a última alteração sem passar pelo LLM e regrava os arquivos.
+- **API** (`api/rotas.py`): `GET /saude`, `POST /sessoes`, `GET /sessoes/{id}`,
+  `POST /sessoes/{id}/mensagens`, `POST /sessoes/{id}/desfazer`, `GET /sessoes/{id}/arquivos/{nome}`.
+  Contrato, erros e segurança em `docs/pecas/api.md`.
 - Tools são closures sobre a `sessao` (várias sessões em paralelo no mesmo processo).
 
 ### Modelo (`app/dominio/`)
@@ -126,6 +131,14 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
   exige devolver "thought signatures" entre chamadas de ferramentas.
 - **Gemini sem `temperature`** (o Google recomenda o padrão 1.0 nos modelos 3.x).
 - **Anthropic sem `temperature`**: a API recusa o parâmetro nos modelos Claude 5.
+- **Visão ↔ backend só por HTTP, sem modo "embutido"**: um caminho só para testar e manter. O custo
+  é abrir dois terminais.
+- **Provedor, modelo e chave só no `.env` do servidor**: saíram a seleção de modelo na tela, o campo
+  de chave, `--provedor/--modelo` do terminal e `Sessao.trocar_llm`. A chave nunca trafega.
+- **Sessões em memória no servidor** (`api/registro.py`), com trava por sessão, limite de 50 e
+  retomada do desenho a partir de `sessoes/<id>/processo.json` quando o servidor reinicia.
+- **Rota de turno síncrona** (`def`, em thread): streaming ficou para depois e é aditivo.
+- **Sem autenticação, preso a `127.0.0.1`**: é protótipo local; o servidor avisa se o host mudar.
 
 ## 5. Pesquisa de LLMs (outubro/2026 — reconferir antes de mudar padrões)
 
@@ -148,8 +161,9 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
    asserções sobre o modelo final (`problemas() == []`, nº de fins, rótulos das decisões) e sobre
    o estilo das respostas (nº de "?" por mensagem, lista de termos proibidos). Permite comparar
    provedores objetivamente.
-3. **Streaming** da resposta no Streamlit (`graph.stream(..., stream_mode="messages")`) — modelos
-   lentos parecem travados com o spinner.
+3. **Streaming** da resposta: rota nova `POST /sessoes/{id}/mensagens/fluxo` (SSE) sobre
+   `graph.stream(..., stream_mode=["messages","updates"])`, `Sessao.enviar_em_fluxo`, e `st.write_stream`
+   na página. É aditivo: a rota síncrona continua. Modelos lentos parecem travados com o spinner.
 4. **Persistência da conversa**: trocar `MemorySaver` por `SqliteSaver`
    (`langgraph-checkpoint-sqlite`) para retomar após reiniciar. Hoje só o diagrama persiste (JSON).
 5. **Robustez do agente**:
@@ -171,9 +185,13 @@ destaque em verde por marker CSS). No Streamlit vai por `components.html`.
 
 - `pkill -f "streamlit run"` dentro de um comando que contém essa string mata o próprio shell;
   use `kill $(pgrep -f "streamli[t] run")`.
-- O Streamlit roda o script inteiro a cada interação; a `Sessao` vive em `st.session_state`.
-  Trocar provedor na barra lateral **não** troca o modelo da sessão atual — é preciso clicar
-  "🔁 Trocar modelo" (ou "Nova conversa").
+- O Streamlit roda o script inteiro a cada interação; em `st.session_state` fica só o id da sessão,
+  e a cada execução a página pede o estado à API.
+- A API precisa estar no ar antes da página web ou do terminal. Nunca rode com `--workers` > 1
+  (sessões em memória). Com `uvicorn --reload`, cada arquivo salvo reinicia as conversas.
+- Trocar de modelo = editar o `.env` e reiniciar o servidor.
+- `st.components.v1.html` (usado em `visao/web.py` para o diagrama) está marcado como obsoleto no
+  Streamlit instalado, que sugere `st.iframe`. Ainda funciona; trocar antes de atualizar o Streamlit.
 - unpkg pode estar bloqueado em ambientes com proxy; `scripts/renderizar.py` usa o bpmn-js local
   de `scripts/node_modules`. Para o app funcionar offline, servir os assets localmente
   (`html_visualizador(base=...)` já aceita outra URL).

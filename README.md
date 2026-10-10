@@ -11,11 +11,21 @@ fluxo de trabalho com perguntas simples, uma de cada vez, e vai montando um diag
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # coloque a chave de um provedor
-streamlit run src/bpmn_agent/visao/web.py     # interface web (chat + diagrama ao vivo)
-# ou
-python -m bpmn_agent.visao.terminal --debug         # terminal; gera sessoes/<id>/visualizar.html
-python -m pytest              # testes (não usam API)
+cp .env.example .env          # escolha o provedor e coloque a chave
+python -m pytest              # testes (não usam API de LLM nem precisam do serviço)
+```
+
+A visão e o backend são dois programas que conversam por HTTP. Em um terminal, suba o serviço:
+
+```bash
+python -m bpmn_agent.api.servidor             # http://127.0.0.1:8000 (rotas em /docs)
+```
+
+Em outro, a interface:
+
+```bash
+streamlit run src/bpmn_agent/visao/web.py     # página web (chat + diagrama ao vivo)
+python -m bpmn_agent.visao.terminal --debug   # ou a conversa no terminal
 ```
 
 O `.bpmn` gerado abre no [bpmn.io](https://demo.bpmn.io), Camunda Modeler, Bizagi, Signavio etc.
@@ -24,8 +34,8 @@ o `.json` pode ser carregado depois para continuar a conversa.
 
 ## LLMs baratas ou gratuitas
 
-Troque com `LLM_PROVEDOR` no `.env` ou na barra lateral do app (dá até para trocar no meio
-da conversa e comparar). Preços e limites conferidos em outubro/2026 — mudam com frequência.
+Escolha com `LLM_PROVEDOR` (e, se quiser, `LLM_MODELO`) no `.env` e reinicie o serviço. O
+modelo e a chave ficam só no servidor. Preços e limites conferidos em outubro/2026 — mudam com frequência.
 
 | Provedor | Modelo padrão | Custo | Observações |
 |---|---|---|---|
@@ -42,12 +52,17 @@ Uma conversa típica (15–25 turnos) consome poucas centenas de milhares de tok
 
 ```
 src/bpmn_agent/
-  visao/                   o que a pessoa vê
+  visao/                   o que a pessoa vê (cliente HTTP; não importa o backend)
     web.py                 página web (Streamlit)
     terminal.py            conversa no terminal
+    cliente.py             faz os pedidos à API
     visualizador.py        HTML com bpmn-js para mostrar o diagrama
-  app/                     backend (não depende da visão)
-    sessao.py              Sessao: histórico, enviar, trocar modelo
+  api/                     serviço HTTP (FastAPI)
+    servidor.py            ponto de entrada; lê o .env
+    rotas.py, esquemas.py  as rotas e o formato das mensagens
+    registro.py            sessões vivas na memória
+  app/                     backend (não sabe de HTTP nem de tela)
+    sessao.py              Sessao: histórico, enviar, desfazer
     persistencia.py        gravar e ler arquivos
     agente/
       grafo.py             grafo LangGraph (nó agente + nó ferramentas)

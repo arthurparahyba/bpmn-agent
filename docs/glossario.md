@@ -55,6 +55,12 @@ crases são nomes que aparecem no código.
 | **`thread_id`** | Identificador que diz ao checkpointer de qual conversa estamos falando. Usamos o id da sessão. |
 | **`HumanMessage`, `AIMessage`, `ToolMessage`, `SystemMessage`** | Os quatro tipos de mensagem do LangChain: fala do usuário, resposta da LLM, resultado de uma tool e instruções de sistema. |
 | **`bind_tools`** | Método do LangChain que entrega à LLM a lista de tools disponíveis. |
+| **FastAPI** | Biblioteca Python para escrever APIs HTTP. Confere os dados que chegam e gera sozinha a página `/docs` com as rotas. |
+| **uvicorn** | O programa que mantém a API no ar e entrega os pedidos ao FastAPI. |
+| **httpx** | Biblioteca Python para fazer pedidos HTTP. É o que o `cliente.py` usa. |
+| **Pydantic** | Biblioteca que descreve o formato dos dados (os "esquemas") e recusa o que não bate. |
+| **`TestClient`** | Ferramenta do FastAPI que chama a API dentro do próprio teste, sem abrir porta nem usar a rede. |
+| **Worker** | Cada cópia do servidor rodando. Usamos uma só, porque as sessões ficam na memória dela. |
 | **Streamlit** | Biblioteca Python para fazer páginas web simples sem escrever HTML. Roda o script inteiro de novo a cada clique. |
 | **`st.session_state`** | A "memória" do Streamlit entre uma execução do script e a próxima. É onde a `Sessao` vive. |
 | **bpmn-js** | Biblioteca JavaScript do projeto bpmn.io que desenha um arquivo `.bpmn` no navegador. |
@@ -66,19 +72,27 @@ crases são nomes que aparecem no código.
 
 | Termo | Significado |
 |---|---|
+| **API HTTP** | Conjunto de endereços (rotas) que um programa oferece para outros programas pedirem coisas pela rede. Aqui, é como a visão pede coisas ao backend. |
 | **Backend** | A parte do programa que faz o trabalho e não aparece na tela. Aqui é a pasta `app`. |
 | **Camada** | Grupo de arquivos com um papel só, que pode usar as camadas abaixo dela mas não as de cima. As nossas: visão, sessão, agente, exportação, domínio. |
+| **Cliente e servidor** | Dois programas que conversam: o servidor fica no ar esperando pedidos; o cliente faz os pedidos. Aqui, o servidor é `api/servidor.py` e os clientes são a página web e o terminal. |
 | **Closure** | Função criada dentro de outra, que "lembra" as variáveis de onde nasceu. As tools são closures que lembram a qual sessão pertencem. |
 | **Dataclass** | Classe Python que só guarda dados, declarada de forma curta. `Elemento`, `Fluxo` e `Processo` são dataclasses. |
 | **Domínio** | O miolo do programa: os dados do processo e as regras para alterá-lo, sem LLM, sem tela e sem arquivos. Pasta `app/dominio`. |
+| **Código de status** | Número que acompanha toda resposta HTTP e diz o resultado: 200 e 201 deram certo, 404 não encontrado, 409 ocupado, 422 pedido inválido, 502 e 503 falha do outro lado. |
 | **Determinístico** | Que dá sempre o mesmo resultado para a mesma entrada. O modelo e o exportador são assim; a LLM não é. |
+| **HTTP** | O protocolo da web: um programa envia um pedido (método + endereço + dados) e recebe uma resposta. |
 | **Instalação editável** | Forma de instalar o projeto em que o Python passa a usar direto os arquivos de `src/`, sem copiá-los. Mudou o código, já vale. É o que `pip install -r requirements.txt` faz. |
+| **JSON** | Formato de texto para dados (`{"nome": "valor"}`). É como o processo é gravado em disco e como os dados trafegam pela API. |
 | **Pacote** | Pasta com código Python que pode ser importada (`bpmn_agent`, `bpmn_agent.app.dominio`...). |
 | **Persistência** | Guardar dados em disco para que sobrevivam ao fim do programa. Arquivo `app/persistencia.py`. |
 | **`pyproject.toml`** | Arquivo que descreve o projeto para o Python: nome, dependências e onde está o código. |
+| **Rota** | Um endereço da API e o que ele faz, por exemplo `POST /sessoes/{id}/mensagens`. `GET` pede dados; `POST` envia algo. |
 | **Snapshot** | Cópia completa do processo tirada antes de cada alteração. É o que torna o "desfazer" possível. |
 | **Ordem topológica** | Ordenar os elementos de modo que cada um apareça depois de todos os que levam até ele. Usada para decidir as colunas do desenho. |
 | **Busca em profundidade** (DFS) | Jeito de percorrer um grafo seguindo um caminho até o fim antes de tentar o próximo. Usada para achar as voltas. |
+| **Thread** | Linha de execução dentro de um programa. O servidor usa várias para atender pedidos ao mesmo tempo. |
+| **Trava** | Mecanismo que deixa só um pedido por vez mexer em uma sessão. Os outros esperam, ou são recusados. |
 | **Visão** | A parte do programa que a pessoa vê e usa: a página web e o terminal. Pasta `visao`. |
 | **XML** | Formato de texto com marcações entre `<` e `>`. O arquivo `.bpmn` é um XML. |
 | **`.env`** | Arquivo local com configurações e segredos (provedor, modelo, chave de API). |

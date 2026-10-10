@@ -4,7 +4,8 @@
 
 ## Em uma frase
 
-Conferem o modelo, o exportador e o laço do agente sem internet, sem chave e sem custo.
+Conferem o modelo, o exportador, o laço do agente, a API e o cliente sem internet, sem
+chave e sem custo.
 
 ## Como rodar
 
@@ -29,6 +30,13 @@ flowchart LR
         A4["corte do histórico"]
     end
     tm --> MOD["dominio<br/>exportar_bpmn.py<br/>persistencia.py"]
+    subgraph tapi["test_api.py + test_cliente.py"]
+        P1["rotas e erros"]
+        P2["sessões no servidor"]
+        P3["cliente contra a API"]
+    end
+    tapi --> API["api/<br/>visao/cliente.py"]
+    tc["test_camadas.py"] --> REG["regras de import<br/>de todas as camadas"]
     ta --> AG["sessao.py<br/>grafo.py<br/>ferramentas.py"]
 ```
 
@@ -77,6 +85,38 @@ Cada item de `respostas` é uma resposta da LLM, na ordem em que será pedida. U
 tools consome pelo menos duas: a que pede as tools e a que responde em texto. Use
 `tmp_path` como pasta, para o teste não escrever em `sessoes/`.
 
+### `test_api.py`
+
+Testa as rotas com o `TestClient` do FastAPI, que chama a API em memória, sem abrir porta
+nenhuma. A LLM roteirizada entra pelo parâmetro `fabrica_llm` de `criar_app`, e a pasta de
+sessões é o `tmp_path` do teste.
+
+| O que garante |
+|---|
+| `/saude` informa provedor e modelo, e nunca a chave. |
+| Criar sessão devolve o estado com a saudação e não grava nada em disco. |
+| Um turno atualiza o estado, devolve ações e alterados, e grava os arquivos. |
+| Desfazer e baixar os três arquivos funcionam; nome de arquivo desconhecido é recusado. |
+| Continuar a partir de um `processo.json` enviado; arquivo inválido dá 422. |
+| Sessão inexistente dá 404 com frase para leigo. |
+| Id fora do formato, texto vazio ou longo demais e pedido grande demais são recusados. |
+| Falha da LLM vira 502 com dica; LLM não configurada vira 503. |
+| Segunda mensagem durante um turno dá 409. |
+| Servidor reiniciado retoma o desenho do disco. |
+| O registro descarta a sessão parada há mais tempo ao passar do limite. |
+
+### `test_cliente.py`
+
+Roda o `ClienteApi` de verdade contra a API em memória: um roteiro completo (criar,
+enviar, consultar, continuar, desfazer), um erro 404 e um serviço desligado. É este teste
+que garante que o cliente e a API continuam combinando.
+
+### `test_camadas.py`
+
+Lê os `import` de cada arquivo de `src/bpmn_agent/` e falha se uma camada importar o que
+não pode (por exemplo, `visao` importando `app`, ou `app` importando `fastapi`). A lista
+das proibições está no próprio teste e reflete a tabela de [../README.md](../README.md).
+
 ## O que os testes não cobrem
 
 | Não coberto | Como conferir hoje |
@@ -85,4 +125,4 @@ tools consome pelo menos duas: a que pede as tools e a que responde em texto. Us
 | A conexão com cada provedor (`llm.py`) | Idem. |
 | A qualidade visual do layout | Gerar o PNG com `scripts/renderizar.py` e olhar. |
 | A validade do `.bpmn` segundo o leitor oficial | `node scripts/validar_bpmn.mjs <arquivo>`. |
-| A tela do Streamlit | Abrir a página web e usar. |
+| A tela do Streamlit e o laço do terminal | Subir o serviço, abrir a página web ou o terminal e usar. |

@@ -10,8 +10,12 @@ eles.
 ## Responsabilidade
 
 - Manter a tabela de provedores e o modelo padrão de cada um (`PROVEDORES`).
-- Ler provedor, modelo e chave do ambiente (`.env`).
+- Ler provedor, modelo e chave das variáveis de ambiente (que o servidor carrega do `.env`).
+- Dizer qual provedor e qual modelo estão configurados (`llm_configurada`).
 - Devolver um objeto do LangChain pronto para uso (`criar_llm`).
+
+O provedor e o modelo são definidos **só no `.env` do servidor**. Não há escolha de modelo
+pela tela nem pela API: para trocar, edita-se o `.env` e reinicia-se o serviço.
 
 O restante da aplicação não sabe qual provedor está em uso: recebe um objeto com a mesma
 "cara" em todos os casos.
@@ -66,11 +70,10 @@ previsíveis. Só é enviada aos provedores que usam `ChatOpenAI`.
 
 ## Quem usa
 
-- `web.py`: lê `PROVEDORES` para montar a barra lateral e chama `criar_llm` com o que o
-  usuário escolheu.
-- `terminal.py`: chama `criar_llm` com as opções `--provedor` e `--modelo`.
-
-O objeto criado é entregue à `Sessao`, que o passa para `construir_grafo`.
+- `api/registro.py` chama `criar_llm()`, sem argumentos, a cada sessão criada. O objeto é
+  entregue à `Sessao`, que o passa para `construir_grafo`.
+- `api/rotas.py` chama `llm_configurada()` na rota `/saude`, para a tela poder mostrar o
+  modelo em uso. Só o nome do provedor e do modelo saem; a chave, nunca.
 
 ## Cuidados ao alterar
 

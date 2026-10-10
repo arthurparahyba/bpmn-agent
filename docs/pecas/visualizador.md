@@ -64,8 +64,8 @@ O `scripts/renderizar.py` espera por esse sinal antes de tirar a foto da página
 
 | Quem | Como |
 |---|---|
-| `web.py` | Coloca a página dentro da tela do Streamlit, à direita do chat. |
-| `terminal.py` | Grava a página em `sessoes/<id>/visualizar.html`, para abrir no navegador. |
+| `web.py` | Coloca a página dentro da tela do Streamlit, à direita do chat. O XML vem da API. |
+| `terminal.py` | Grava a página em `visualizar.html`, na pasta temporária do computador, para abrir no navegador. |
 | `scripts/renderizar.py` | Abre a página em um navegador controlado por código e salva um PNG, usando a cópia local do bpmn-js. |
 
 ## Cuidados ao alterar
