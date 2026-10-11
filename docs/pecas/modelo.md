@@ -249,7 +249,9 @@ aprendida pelo sistema. Regras do modelo:
 - **Sistema e participante não se misturam**: o nome de um sistema não pode ser `responsavel` nem
   participante, e o de um participante não pode virar sistema. O erro explica o caminho certo à LLM.
 - Aparecem no `resumo()` (seção "Sistemas"), na `narrativa()` e na documentação de cada passo no `.bpmn`
-  (`Sistema: X — operação`). Arquivos `processo.json` antigos, sem esses campos, continuam abrindo.
+  (`Sistema: X — operação`). No desenho, o sistema também aparece como **segunda linha do nome** do passo
+  (`[Sistema de Apólices]`), só em tarefas, para dar para ler sem abrir o documento; o nome guardado no modelo
+  não muda. Arquivos `processo.json` antigos, sem esses campos, continuam abrindo.
 
 ## Em que raia cada coisa aparece: `raia_de(id)` (em `analise.py`)
 

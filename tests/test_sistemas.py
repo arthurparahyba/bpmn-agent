@@ -138,3 +138,12 @@ def test_resumo_avisa_sistema_deduzido_que_a_pessoa_nao_citou():
     sem_texto = resumo_mudancas(antes, set(), m)
     assert "deduzido" not in dito and "deduzido" not in sem_texto
     assert "sistema deduzido, não dito por você (confirme): Core Bancário em Enviar confirmação" in deduzido
+
+
+def test_bpmn_mostra_o_sistema_na_segunda_linha_do_passo_mas_so_em_tarefas():
+    m = com_core()
+    m.adicionar_elemento("fim", "Fim", depois_de="Passo_1")
+    raiz = ET.fromstring(gerar_bpmn_xml(m))
+    assert raiz.find(".//bpmn:serviceTask", NS).get("name") == "Abrir conta\n[Core Bancário]"
+    assert raiz.find(".//bpmn:endEvent", NS).get("name") == "Fim"
+    assert m.p.elementos["Passo_1"].nome == "Abrir conta"      # o nome no modelo não é alterado

@@ -203,7 +203,9 @@ def gerar_bpmn_xml(m: ModeloProcesso) -> str:
                     ET.SubElement(lane, _q("bpmn", "flowNodeRef")).text = i
 
     for e in p.elementos.values():
-        no = ET.SubElement(proc, _q("bpmn", e.tipo), {"id": e.id, "name": e.nome})
+        # o sistema aparece dentro do próprio passo (2ª linha), para dar para ler no desenho
+        rotulo = e.nome + (f"\n[{e.sistema}]" if e.sistema and e.tipo.endswith("Task") else "")
+        no = ET.SubElement(proc, _q("bpmn", e.tipo), {"id": e.id, "name": rotulo})
         doc = "\n".join(([e.descricao] if e.descricao else [])
                         + ([f"Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao else "")] if e.sistema else [])
                         + [f"Regra: {r}" for r in e.regras])
