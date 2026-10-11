@@ -46,6 +46,12 @@ PROVEDORES = {
         "env_chave": "ANTHROPIC_API_KEY",
         "obter_chave": "https://console.anthropic.com/settings/keys",
     },
+    "openai": {
+        "modelo": "gpt-5.6-luna",
+        "env_chave": "OPENAI_API_KEY",
+        "base_url": None,
+        "obter_chave": "https://platform.openai.com/api-keys",
+    },
     "ollama": {
         "modelo": "qwen3:8b",
         "env_chave": None,
@@ -87,5 +93,9 @@ def criar_llm(provedor: str | None = None, modelo: str | None = None,
         # O modo "pensamento" do DeepSeek exige reenviar o raciocínio a cada chamada com ferramentas;
         # para uma entrevista conversacional o modo direto é suficiente, mais rápido e mais barato.
         extra["extra_body"] = {"thinking": {"type": "disabled"}}
+    if provedor == "openai":
+        # Modelos GPT-5 recusam temperature diferente do padrão e só aceitam ferramentas
+        # com raciocínio pela API Responses (não pela /chat/completions).
+        return ChatOpenAI(model=modelo, api_key=chave, max_retries=3, use_responses_api=True)
     return ChatOpenAI(model=modelo, api_key=chave, base_url=cfg["base_url"],
                       temperature=temperatura, max_retries=3, **extra)
