@@ -315,7 +315,7 @@ Compara uma "foto" do processo tirada antes do turno com o processo depois e dev
 `O que mudou de fato no desenho: 3 item(ns) novo(s): ...; alterado(s): Pagar imposto (a descrição); ligações: +2 / -0.`
 Sem mudança, diz `nada`. É calculada pelo código, sem a LLM. Se a `Sessao` passa o texto da pessoa, acrescenta
 `sistema deduzido, não dito por você (confirme): X em Y` quando um passo ganhou um sistema que a mensagem não
-cita (nem o nome, nem uma palavra de pelo menos 3 letras dele, nem a operação). Quem a usa é a `Sessao` (ver [sessao.md](sessao.md)).
+cita (nem o nome, nem uma palavra de pelo menos 3 letras dele, nem a operação). Num turno de confirmação ("Sim"), a `Sessao` passa junto o pedido guardado, que é onde está o que a pessoa disse de fato. Quem a usa é a `Sessao` (ver [sessao.md](sessao.md)).
 
 ## Duas descrições em texto (em `textos.py`)
 

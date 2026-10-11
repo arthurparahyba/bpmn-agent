@@ -99,7 +99,9 @@ class Sessao:
         texto = falas[-1] if falas else "Pronto, atualizei o desenho. O que acontece em seguida?"
         sufixo = ""
         if acoes:   # houve ferramentas: o código confere e mostra o que mudou de fato, sem confiar na fala da LLM
-            sufixo += MARCADOR_MUDANCAS + resumo_mudancas(antes, fluxos_antes, self.modelo, texto_usuario=texto_usuario)
+            # num turno de confirmação ("Sim"), o que a pessoa disse de fato está no pedido guardado
+            dito = f"{texto_usuario} {self.pedido_liberado}".strip()
+            sufixo += MARCADOR_MUDANCAS + resumo_mudancas(antes, fluxos_antes, self.modelo, texto_usuario=dito)
         aviso = aviso_de_conclusao(self.modelo, texto)   # fala sem pergunta + pontos em aberto = não deixa passar
         if aviso:
             sufixo += MARCADOR_ABERTOS + aviso

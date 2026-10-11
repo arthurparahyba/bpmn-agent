@@ -77,6 +77,7 @@ tudo o que recebeu, o que permite conferir o que o nó `agente` enviou.
 | `test_turno_sem_ferramentas_nao_ganha_resumo_e_a_llm_nao_ve_o_resumo` | Turno só de conversa não tem resumo, e a LLM não recebe o resumo de turnos anteriores. |
 | `test_fala_sem_pergunta_com_pontos_em_aberto_ganha_aviso_do_codigo_e_a_llm_nao_o_ve` | Fala que encerra sem pergunta, com pontos em aberto, ganha o aviso ⚠️ (sem ids) e a LLM não o vê. |
 | `test_fala_com_pergunta_ou_diagrama_completo_nao_ganha_aviso` | Se o agente está perguntando, ou o diagrama está completo, não há aviso. |
+| `test_confirmar_com_sim_nao_marca_como_deduzido_o_sistema_que_estava_no_pedido_guardado` | No turno do "Sim", um sistema citado no pedido guardado não vira "deduzido"; um que ninguém citou continua avisando. |
 | `test_pedido_em_duvida_mostra_que_nada_mudou` | Ao segurar um pedido, o resumo diz `nada`. |
 | `test_estado_no_fim_deixa_o_comeco_estavel_e_manda_o_diagrama_na_ultima_mensagem` | Com `estado_no_fim`, o prompt não tem o diagrama, o começo é idêntico entre chamadas, o diagrama vai na última mensagem (atualizado a cada chamada) e não entra no histórico. |
 | `test_cortar_historico_comeca_em_mensagem_do_usuario` | O corte do histórico sempre começa em uma mensagem do usuário. |

@@ -209,6 +209,23 @@ def test_fala_com_pergunta_ou_diagrama_completo_nao_ganha_aviso(tmp_path):
     assert completo.problemas() == [] and aviso_de_conclusao(completo, "Pronto, terminamos.") == ""
 
 
+def test_confirmar_com_sim_nao_marca_como_deduzido_o_sistema_que_estava_no_pedido_guardado(tmp_path):
+    duvida = AIMessage(content="", tool_calls=[chamada("pedir_confirmacao", {
+        "motivo": "ordem diferente", "pedido": "o financeiro calcula o ITCMD no Portal da Sefaz"}, 70)])
+    aplica = AIMessage(content="", tool_calls=[
+        chamada("adicionar_elemento", {"tipo": "tarefa_pessoa", "nome": "Calcular ITCMD", "responsavel": "Financeiro",
+                                       "sistema": "Portal da Sefaz"}, 71),
+        chamada("adicionar_elemento", {"tipo": "tarefa_pessoa", "nome": "Consolidar bens", "responsavel": "Advogado",
+                                       "sistema": "SGE"}, 72)])
+    s, _ = _sessao_com_passo(tmp_path, duvida, AIMessage(content="Isso muda a ordem. Confirma?"),
+                             aplica, AIMessage(content="Feito."))
+    s.enviar("o financeiro calcula o ITCMD no Portal da Sefaz")
+    r = s.enviar("Sim")
+
+    assert "sistema deduzido" in r.texto and "SGE em Consolidar bens" in r.texto      # ninguém falou de SGE: continua avisando
+    assert "Portal da Sefaz em Calcular ITCMD" not in r.texto                          # estava no pedido guardado: não é dedução
+
+
 def test_pedido_em_duvida_mostra_que_nada_mudou(tmp_path):
     s, _ = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA)
     r = s.enviar("quem aprova o pagamento é o advogado")
