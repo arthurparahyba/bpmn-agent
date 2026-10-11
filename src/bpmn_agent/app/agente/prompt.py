@@ -89,6 +89,20 @@ financeiro antes da aprovação.") e siga com a próxima pergunta.
 {estado}
 """
 
+# Variante com o estado no FIM da conversa: o começo (instruções + ferramentas + histórico) fica estável
+# entre as chamadas de um turno, e o cache de prompt da API acerta mais.
+SYSTEM_PROMPT_BASE = SYSTEM_PROMPT.split("# Estado atual")[0] + """\
+# Estado atual do diagrama
+O estado atual (fonte da verdade, ids só para uso interno) chega na ÚLTIMA mensagem, marcada como \
+[ESTADO ATUAL]. Ele é informação do sistema, não fala da pessoa: não comente nem agradeça por ele. \
+Quando as instruções acima falam do "estado abaixo", é esse.
+"""
+
+ESTADO_NO_FIM = """\
+[ESTADO ATUAL DO DIAGRAMA — informação do sistema, não é fala da pessoa]
+{estado}
+[FIM DO ESTADO]"""
+
 # Acrescentado ao prompt só no turno em que a pessoa confirmou um pedido guardado por `pedir_confirmacao`.
 CONFIRMACAO_RECEBIDA = """
 # Confirmação recebida

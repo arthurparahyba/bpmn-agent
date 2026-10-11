@@ -188,6 +188,20 @@ def test_pedido_em_duvida_mostra_que_nada_mudou(tmp_path):
     assert "O que mudou de fato no desenho: nada." in r.texto
 
 
+def test_estado_no_fim_deixa_o_comeco_estavel_e_manda_o_diagrama_na_ultima_mensagem(tmp_path):
+    novo = AIMessage(content="", tool_calls=[chamada("adicionar_elemento", {"tipo": "tarefa", "nome": "Revisar"}, 50)])
+    llm = LLMRoteirizado(respostas=[novo, AIMessage(content="Coloquei.")])
+    s = Sessao(llm, pasta=tmp_path, estado_no_fim=True)
+    s.enviar("coloca revisar")
+
+    primeira, segunda = llm.vistos[0], llm.vistos[1]
+    assert "Elementos:" not in primeira[0].content and "Elementos:" not in segunda[0].content   # prompt sem o diagrama
+    assert primeira[0].content == segunda[0].content                                              # começo idêntico
+    assert primeira[-1].type == "human" and "[ESTADO ATUAL" in primeira[-1].content
+    assert "Revisar" in segunda[-1].content and "Revisar" not in primeira[-1].content            # estado fresco a cada chamada
+    assert not any("[ESTADO ATUAL" in str(m.content) for m in s.mensagens())                      # não vai para o histórico
+
+
 def test_cortar_historico_comeca_em_mensagem_do_usuario():
     from langchain_core.messages import HumanMessage
     msgs = []

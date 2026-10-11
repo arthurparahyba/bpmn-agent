@@ -46,7 +46,7 @@ class Sessao:
     """Uma conversa = um processo + um thread no LangGraph + arquivos salvos em disco."""
 
     def __init__(self, llm: BaseChatModel, pasta: str | Path = "sessoes",
-                 modelo: ModeloProcesso | None = None, id: str | None = None):
+                 modelo: ModeloProcesso | None = None, id: str | None = None, estado_no_fim: bool = False):
         self.id = id or uuid.uuid4().hex[:8]
         self.pasta = Path(pasta) / self.id
         self.modelo = modelo or ModeloProcesso()
@@ -55,7 +55,7 @@ class Sessao:
         # até a pessoa confirmar ou cancelar. `pedido_liberado` vale só durante o turno da confirmação.
         self.pendente: dict[str, str] | None = None
         self.pedido_liberado: str = ""
-        self.grafo = construir_grafo(llm, self, self.checkpointer)
+        self.grafo = construir_grafo(llm, self, self.checkpointer, estado_no_fim)
         self.config = {"configurable": {"thread_id": self.id}, "recursion_limit": LIMITE_PASSOS_GRAFO}
         saudacao = SAUDACAO if not self.modelo.p.elementos else (
             f"Oi de novo! Carreguei o processo **{self.modelo.p.nome}**. "

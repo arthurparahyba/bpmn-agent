@@ -20,7 +20,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from bpmn_agent.app.agente.ferramentas import criar_ferramentas
-from bpmn_agent.app.agente.prompt import CONFIRMACAO_RECEBIDA, SYSTEM_PROMPT
+from bpmn_agent.app.agente.prompt import (
+    CONFIRMACAO_RECEBIDA, ESTADO_NO_FIM, SYSTEM_PROMPT, SYSTEM_PROMPT_BASE,
+)
 from bpmn_agent.app.dominio import ErroModelo
 from bpmn_agent.app.dominio.textos import MARCADOR_MUDANCAS
 
@@ -62,21 +64,24 @@ def cortar_historico(msgs: list[AnyMessage], max_turnos: int = MAX_TURNOS_HISTOR
     return msgs[idx_humanos[-max_turnos]:]
 
 
-def construir_grafo(llm: BaseChatModel, sessao, checkpointer=None):
+def construir_grafo(llm: BaseChatModel, sessao, checkpointer=None, estado_no_fim: bool = False):
     ferramentas = criar_ferramentas(sessao)
     por_nome = {t.name: t for t in ferramentas}
     llm_com_ferramentas = llm.bind_tools(ferramentas)
 
     def agente(state: MessagesState):
-        texto_sistema = SYSTEM_PROMPT.format(estado=sessao.modelo.resumo())
-        if sessao.pedido_liberado:
-            texto_sistema += CONFIRMACAO_RECEBIDA.format(pedido=sessao.pedido_liberado)
-        sistema = SystemMessage(texto_sistema)
+        extra = CONFIRMACAO_RECEBIDA.format(pedido=sessao.pedido_liberado) if sessao.pedido_liberado else ""
         historico = cortar_historico(sem_resumo_de_mudancas(state["messages"]))
         if historico and not isinstance(historico[0], HumanMessage):
             # alguns provedores (Anthropic, Gemini) exigem que a conversa comece pelo usuário
             historico = [HumanMessage(content="(início da conversa)"), *historico]
-        resposta = llm_com_ferramentas.invoke([sistema, *historico])
+        if estado_no_fim:
+            fim = HumanMessage(content=ESTADO_NO_FIM.format(estado=sessao.modelo.resumo()) + extra)
+            mensagens = [SystemMessage(SYSTEM_PROMPT_BASE), *historico, fim]
+        else:
+            sistema = SystemMessage(SYSTEM_PROMPT.format(estado=sessao.modelo.resumo()) + extra)
+            mensagens = [sistema, *historico]
+        resposta = llm_com_ferramentas.invoke(mensagens)
         return {"messages": [resposta]}
 
     def executar_ferramentas(state: MessagesState):

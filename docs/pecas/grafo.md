@@ -71,6 +71,15 @@ garantir a execução em sequência e esse tratamento de erro.
 Decide a seta que sai do nó `agente`: se a resposta da LLM tem pedidos de tool, vai para
 `ferramentas`; se não, o turno acabou.
 
+### Estado no fim (`estado_no_fim`)
+
+Opção de `construir_grafo` e de `Sessao` (padrão: desligada). Em vez de colocar o diagrama dentro do
+prompt de sistema, manda o prompt **sem** o diagrama (`SYSTEM_PROMPT_BASE`) e acrescenta o diagrama como
+**última mensagem** (`ESTADO_NO_FIM`), a cada chamada, sem gravá-lo no histórico. O começo da conversa
+(ferramentas, instruções, histórico) fica igual entre as chamadas de um turno, e o cache de prompt da API
+acerta mais. Medido com o `gpt-5.6-luna` em 5 turnos (2 execuções por variante): cache de ~11% para
+~40% e custo ~25% menor, sem erros de ferramenta a mais.
+
 ### `cortar_historico`
 
 Mantém as mensagens a partir do 14º turno mais recente do usuário
