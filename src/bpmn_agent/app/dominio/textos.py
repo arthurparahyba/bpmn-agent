@@ -58,12 +58,27 @@ def resumo(m: ModeloProcesso) -> str:
 
 
 MARCADOR_MUDANCAS = "\n\n🔎 "
+MARCADOR_ABERTOS = "\n\n⚠️ "
+MIN_ELEMENTOS_PARA_AVISAR = 3
 _CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição", "o sistema", "a operação no sistema")
 
 
 def assinatura(e: Elemento) -> tuple:
     """Tudo o que o resumo de mudanças compara de um elemento (na ordem de _CAMPOS)."""
     return (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao, e.sistema, e.operacao)
+
+
+def aviso_de_conclusao(m: ModeloProcesso, fala: str, limite: int = 5) -> str:
+    """Calculado pelo código: se a fala do agente NÃO faz pergunta (está encerrando) e o diagrama ainda tem
+    pontos em aberto, devolve o aviso para a pessoa; senão, texto vazio. Os ids saem (são internos)."""
+    if "?" in fala or len(m.p.elementos) < MIN_ELEMENTOS_PARA_AVISAR:
+        return ""
+    abertos = [re.sub(r"\b(?:Passo|Decisao|Fim|Inicio|Espera|Paralelo)_\d+ ", "", x).rstrip(".") for x in m.problemas()]
+    if not abertos:
+        return ""
+    extra = f" e mais {len(abertos) - limite}" if len(abertos) > limite else ""
+    return ("Ainda há pontos em aberto, então o desenho não está completo: "
+            + "; ".join(abertos[:limite]) + extra + ".")
 
 
 def _citado(nomes: list[str], texto: str) -> bool:

@@ -78,6 +78,14 @@ realmente mudou (ex.: `alterado(s): ... (a descrição)` sem nenhum item novo). 
 conversa) não ganham o resumo. Antes de cada chamada, `grafo.py` remove esse trecho das falas que
 vão para a LLM (`sem_resumo_de_mudancas`), para ela não passar a imitá-lo.
 
+### Aviso de conclusão (`aviso_de_conclusao`)
+
+Se a fala do agente **não faz pergunta** (está encerrando, por exemplo "Perfeito! Está documentado") e o diagrama
+ainda tem pontos em aberto (`problemas()`), o código anexa à fala, depois do marcador `⚠️`, "Ainda há pontos em
+aberto, então o desenho não está completo: ...". Os ids técnicos saem do texto. Vale a partir de 3 elementos.
+Como o resumo 🔎, é só para a pessoa: `sem_resumo_de_mudancas` tira os dois marcadores antes de a LLM ler o
+histórico. É a trava contra o agente dar o processo por concluído com coisa pendente.
+
 ### Pedido em dúvida (`pendente`)
 
 Quando a LLM acha que um pedido não combina com o desenho, ela chama a tool `pedir_confirmacao`

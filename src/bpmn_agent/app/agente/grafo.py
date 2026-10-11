@@ -24,7 +24,7 @@ from bpmn_agent.app.agente.prompt import (
     CONFIRMACAO_RECEBIDA, ESTADO_NO_FIM, SYSTEM_PROMPT, SYSTEM_PROMPT_BASE,
 )
 from bpmn_agent.app.dominio import ErroModelo
-from bpmn_agent.app.dominio.textos import MARCADOR_MUDANCAS
+from bpmn_agent.app.dominio.textos import MARCADOR_ABERTOS, MARCADOR_MUDANCAS
 
 MAX_TURNOS_HISTORICO = 14   # turnos do usuário mantidos no contexto (o diagrama vai sempre inteiro)
 LIMITE_PASSOS_GRAFO = 60    # proteção contra loops de ferramentas
@@ -45,12 +45,14 @@ def texto_de(msg: AnyMessage) -> str:
 
 
 def sem_resumo_de_mudancas(msgs: list[AnyMessage]) -> list[AnyMessage]:
-    """Tira das falas do agente o resumo 'O que mudou de fato' que o código anexou: é para a pessoa,
-    e a LLM não deve vê-lo (senão passa a imitá-lo em vez de conferir o diagrama)."""
+    """Tira das falas do agente o que o código anexou ('O que mudou de fato' e o aviso de pontos em aberto):
+    é para a pessoa, e a LLM não deve vê-lo (senão passa a imitá-lo em vez de conferir o diagrama)."""
     saida = []
     for m in msgs:
-        if isinstance(m, AIMessage) and isinstance(m.content, str) and MARCADOR_MUDANCAS in m.content:
-            m = m.model_copy(update={"content": m.content.split(MARCADOR_MUDANCAS)[0]})
+        if isinstance(m, AIMessage) and isinstance(m.content, str):
+            cortes = [m.content.index(x) for x in (MARCADOR_MUDANCAS, MARCADOR_ABERTOS) if x in m.content]
+            if cortes:
+                m = m.model_copy(update={"content": m.content[:min(cortes)]})
         saida.append(m)
     return saida
 

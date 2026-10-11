@@ -75,6 +75,8 @@ tudo o que recebeu, o que permite conferir o que o nó `agente` enviou.
 | `test_resumo_mostra_que_so_a_descricao_mudou_mesmo_se_a_llm_diz_que_detalhou` | A fala ganha "O que mudou de fato" mostrando só a descrição alterada, e a tela (histórico) a exibe. |
 | `test_resumo_lista_itens_novos_e_ligacoes` | O resumo cita os itens novos e a contagem de ligações. |
 | `test_turno_sem_ferramentas_nao_ganha_resumo_e_a_llm_nao_ve_o_resumo` | Turno só de conversa não tem resumo, e a LLM não recebe o resumo de turnos anteriores. |
+| `test_fala_sem_pergunta_com_pontos_em_aberto_ganha_aviso_do_codigo_e_a_llm_nao_o_ve` | Fala que encerra sem pergunta, com pontos em aberto, ganha o aviso ⚠️ (sem ids) e a LLM não o vê. |
+| `test_fala_com_pergunta_ou_diagrama_completo_nao_ganha_aviso` | Se o agente está perguntando, ou o diagrama está completo, não há aviso. |
 | `test_pedido_em_duvida_mostra_que_nada_mudou` | Ao segurar um pedido, o resumo diz `nada`. |
 | `test_estado_no_fim_deixa_o_comeco_estavel_e_manda_o_diagrama_na_ultima_mensagem` | Com `estado_no_fim`, o prompt não tem o diagrama, o começo é idêntico entre chamadas, o diagrama vai na última mensagem (atualizado a cada chamada) e não entra no histórico. |
 | `test_cortar_historico_comeca_em_mensagem_do_usuario` | O corte do histórico sempre começa em uma mensagem do usuário. |

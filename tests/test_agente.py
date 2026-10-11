@@ -176,9 +176,37 @@ def test_turno_sem_ferramentas_nao_ganha_resumo_e_a_llm_nao_ve_o_resumo(tmp_path
     s.enviar("coloca revisar")
     r = s.enviar("obrigado")
 
-    assert r.texto == "Só uma conversa." and "O que mudou" not in r.texto
+    assert r.texto.startswith("Só uma conversa.") and "O que mudou" not in r.texto
     enviado = " ".join(str(m.content) for m in llm.vistos[-1])
     assert "Coloquei." in enviado and "O que mudou de fato" not in enviado     # a LLM não vê o resumo
+
+
+def test_fala_sem_pergunta_com_pontos_em_aberto_ganha_aviso_do_codigo_e_a_llm_nao_o_ve(tmp_path):
+    novo = AIMessage(content="", tool_calls=[chamada("adicionar_elemento", {"tipo": "tarefa", "nome": "Revisar"}, 60)])
+    s, llm = _sessao_com_passo(tmp_path, novo, AIMessage(content="Coloquei."),
+                               AIMessage(content="Perfeito! O processo está documentado."), AIMessage(content="ok"))
+    s.enviar("coloca revisar")
+    r = s.enviar("correto")
+
+    assert r.texto.startswith("Perfeito! O processo está documentado.")
+    assert "⚠️ Ainda há pontos em aberto" in r.texto and "'Revisar' está sem responsável" in r.texto
+    assert "Passo_" not in r.texto.split("⚠️")[1]                                  # ids não vão para a pessoa
+    s.enviar("valeu")
+    assert "Ainda há pontos em aberto" not in " ".join(str(m.content) for m in llm.vistos[-1])   # a LLM não vê
+
+
+def test_fala_com_pergunta_ou_diagrama_completo_nao_ganha_aviso(tmp_path):
+    novo = AIMessage(content="", tool_calls=[chamada("adicionar_elemento", {"tipo": "tarefa", "nome": "Revisar"}, 61)])
+    s, _ = _sessao_com_passo(tmp_path, novo, AIMessage(content="Coloquei. O que vem depois?"))
+    assert "⚠️" not in s.enviar("coloca revisar").texto                              # ainda está perguntando
+
+    from bpmn_agent.app.dominio import ModeloProcesso
+    from bpmn_agent.app.dominio.textos import aviso_de_conclusao
+    completo = ModeloProcesso()
+    completo.adicionar_participante("Gestor")
+    completo.adicionar_elemento("tarefa_pessoa", "Analisar", "Gestor")
+    completo.adicionar_elemento("fim", "Concluído", depois_de="Analisar")
+    assert completo.problemas() == [] and aviso_de_conclusao(completo, "Pronto, terminamos.") == ""
 
 
 def test_pedido_em_duvida_mostra_que_nada_mudou(tmp_path):
