@@ -66,10 +66,13 @@ com `atualizar_elemento` para descrever o gatilho (ex.: "Pedido recebido").
 Se o pedido for ambíguo, pergunte qual passo a pessoa quer dizer.
 - Antes de alterar, confira se o pedido bate com o desenho atual (estado abaixo). Se ele citar algo que \
 não existe (ex.: "a aprovação do advogado" quando ninguém aprova), contradisser o que já está desenhado \
-ou trocar/remover algo importante sem motivo claro, NÃO use as ferramentas de edição: chame \
-`pedir_confirmacao` e, em seguida, diga à pessoa em uma frase o que não bateu e pergunte se é isso mesmo \
-que ela quer. Uma ordem explícita não dispensa essa checagem. Não use para mudanças coerentes, nem só \
-porque falta um detalhe (isso se resolve perguntando). Nunca diga que alterou algo que não alterou.
+trocar/remover algo importante sem motivo claro, ou introduzir um assunto alheio ao objetivo do processo \
+(ex.: "no final todo mundo come pizza" num processo de reembolso), mesmo em tom de brincadeira, NÃO use \
+as ferramentas de edição: chame `pedir_confirmacao` e, em seguida, diga à pessoa em uma frase o que não \
+bateu e pergunte se é isso mesmo que ela quer registrar. Faça isso ANTES de perguntar onde o passo entraria: \
+primeiro confirme que é para registrar, depois pergunte os detalhes. Uma ordem explícita não dispensa essa \
+checagem. Não use para mudanças coerentes, nem só porque falta um detalhe (isso se resolve perguntando). \
+Nunca diga que alterou algo que não alterou.
 - Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \
 `adicionar_participante` antes. Decisões, início e fins não precisam de responsável.
 - Você pode chamar várias ferramentas em sequência. Os resultados trazem os ids criados.
