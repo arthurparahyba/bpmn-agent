@@ -38,7 +38,7 @@ def problemas(m: ModeloProcesso) -> list[str]:
                 msgs.append(f"Decisão {e.id} '{e.nome}': caminhos sem resposta/condição indicada (para {sem}).")
         if e.tipo not in GATEWAYS and e.tipo != "endEvent" and len(sai) > 1:
             msgs.append(f"{e.id} '{e.nome}' tem várias saídas sem uma decisão; pode faltar uma decisão.")
-        if e.tipo not in HERDAM_RAIA and not e.responsavel and m.p.participantes:
+        if e.tipo not in HERDAM_RAIA and not e.responsavel and not _raia_do_sistema(m, e) and m.p.participantes:
             msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
         if e.tipo == "serviceTask" and not e.sistema:
             msgs.append(f"{e.id} '{e.nome}' é automático, mas não sabemos em qual sistema.")
@@ -49,12 +49,26 @@ def problemas(m: ModeloProcesso) -> list[str]:
     return msgs
 
 
+def _raia_do_sistema(m: ModeloProcesso, e) -> str:
+    """Passo automático sem responsável, feito num sistema DA EMPRESA: a raia leva o nome do sistema.
+    (Sistema de terceiros não vira raia: é desenhado como uma caixa separada, ver exportar_bpmn.)"""
+    if e.responsavel or e.tipo != "serviceTask" or not e.sistema:
+        return ""
+    s = next((x for x in m.p.sistemas if x.nome == e.sistema), None)
+    return e.sistema if s and not s.externo else ""
+
+
+def _raia_propria(m: ModeloProcesso, e) -> str:
+    return e.responsavel or _raia_do_sistema(m, e)
+
+
 def raia_de(m: ModeloProcesso, elem_id: str) -> str:
-    """Participante em cuja raia o elemento é desenhado. Início, fim, decisão, paralelo e espera
-    sem responsável herdam o do passo mais próximo: primeiro olhando para trás, depois para frente."""
+    """Participante (ou sistema da empresa, em passo automático sem responsável) em cuja raia o elemento é
+    desenhado. Início, fim, decisão, paralelo e espera sem responsável herdam o do passo mais próximo:
+    primeiro olhando para trás, depois para frente."""
     e = m.p.elementos[elem_id]
-    if e.responsavel or e.tipo not in HERDAM_RAIA:
-        return e.responsavel
+    if _raia_propria(m, e) or e.tipo not in HERDAM_RAIA:
+        return _raia_propria(m, e)
     para_tras = lambda i: [f.origem for f in m.entradas(i)]   # noqa: E731
     para_frente = lambda i: [f.destino for f in m.saidas(i)]  # noqa: E731
     for vizinhos in (para_tras, para_frente):
@@ -63,8 +77,8 @@ def raia_de(m: ModeloProcesso, elem_id: str) -> str:
             for v in vizinhos(fila.pop(0)):
                 if v in vistos:
                     continue
-                if m.p.elementos[v].responsavel:
-                    return m.p.elementos[v].responsavel
+                if _raia_propria(m, m.p.elementos[v]):
+                    return _raia_propria(m, m.p.elementos[v])
                 vistos.add(v)
                 fila.append(v)
     return ""

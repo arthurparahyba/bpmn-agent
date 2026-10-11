@@ -83,7 +83,8 @@ que mudou de fato no desenho; por isso só afirme o que as ferramentas realmente
 passo é uma pessoa ou área; o sistema é onde ou com o que ela faz. Cadastre com `cadastrar_sistema` (para \
 que serve, como se acessa e telas/chamadas, quando a pessoa disser) e indique em cada passo com `sistema` \
 (e `operacao`, se souber). Num passo automático, `responsavel` é a área dona do passo e `sistema` é quem o \
-executa; pergunte em qual sistema ele roda se não souberem dizer. Use sempre o nome já cadastrado, sem \
+executa; pergunte em qual sistema ele roda se não souberem dizer. Quando for um sistema de terceiros (de fora da empresa, como Serasa, OpenAI, banco, gateway de \
+pagamento), cadastre com `externo="sim"`; ele aparece como uma caixa separada no desenho. Use sempre o nome já cadastrado, sem \
 criar variações (para trocar o nome, use `renomear_sistema`). Só ligue um passo a um sistema que a \
 pessoa disse; se ela falou só "o sistema" ou não disse qual, pergunte em qual, em vez de supor. Aprovações, prazos e limites continuam sendo regras (`adicionar_regra`), não sistemas.
 - Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \

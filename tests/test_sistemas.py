@@ -147,3 +147,56 @@ def test_bpmn_mostra_o_sistema_na_segunda_linha_do_passo_mas_so_em_tarefas():
     assert raiz.find(".//bpmn:serviceTask", NS).get("name") == "Abrir conta\n[Core Bancário]"
     assert raiz.find(".//bpmn:endEvent", NS).get("name") == "Fim"
     assert m.p.elementos["Passo_1"].nome == "Abrir conta"      # o nome no modelo não é alterado
+
+
+def _lanes(m):
+    raiz = ET.fromstring(gerar_bpmn_xml(m))
+    return [l.get("name") for l in raiz.findall(".//bpmn:lane", NS)], raiz
+
+
+def test_passo_automatico_sem_responsavel_num_sistema_da_empresa_vai_para_a_raia_do_sistema():
+    m = ModeloProcesso()
+    m.adicionar_participante("Cliente")
+    m.cadastrar_sistema("CAOS REGISTER")
+    m.adicionar_elemento("tarefa_pessoa", "Registrar", "Cliente")
+    m.adicionar_elemento("tarefa_sistema", "Gerar resumo", "", depois_de="Registrar", sistema="CAOS REGISTER")
+    m.adicionar_elemento("fim", "Pronto", depois_de="Gerar resumo")
+    assert m.raia_de("Passo_2") == "CAOS REGISTER" and m.raia_de("Fim_1") == "CAOS REGISTER"   # o fim herda
+    assert not any("sem responsável" in x for x in m.problemas())
+    assert "CAOS REGISTER" not in m.p.participantes                                           # não vira participante
+    nomes, _ = _lanes(m)
+    assert nomes == ["Cliente", "CAOS REGISTER"]
+
+
+def test_sistema_de_terceiros_vira_caixa_separada_com_seta_de_mensagem():
+    m = ModeloProcesso()
+    m.adicionar_participante("Cliente")
+    m.cadastrar_sistema("OpenAI", externo="sim")
+    m.adicionar_elemento("tarefa_sistema", "Priorizar", "Cliente", sistema="OpenAI")
+    nomes, raiz = _lanes(m)
+    assert nomes == ["Cliente"]                                                  # nenhuma raia nova
+    partes = {p.get("name") for p in raiz.findall(".//bpmn:participant", NS)}
+    assert "OpenAI" in partes
+    msg = raiz.find(".//bpmn:messageFlow", NS)
+    assert msg.get("sourceRef") == "Passo_1" and msg.get("targetRef").startswith("Participant_")
+    assert "OpenAI" in m.resumo() and "externo" in m.resumo()
+
+
+def test_passo_em_sistema_de_terceiros_sem_responsavel_continua_pedindo_responsavel():
+    m = ModeloProcesso()
+    m.adicionar_participante("Cliente")
+    m.cadastrar_sistema("OpenAI", externo="sim")
+    m.adicionar_elemento("tarefa_sistema", "Priorizar", "", sistema="OpenAI")
+    assert any("sem responsável" in x for x in m.problemas())
+
+
+def test_externo_pode_ser_mudado_e_arquivo_antigo_abre_como_interno():
+    m = com_core()
+    assert m.p.sistemas[0].externo is False
+    m.cadastrar_sistema("Core Bancário", externo="sim")
+    assert m.p.sistemas[0].externo is True
+    m.cadastrar_sistema("Core Bancário", externo="nao")
+    assert m.p.sistemas[0].externo is False
+    d = m.para_dict()
+    d["sistemas"][0].pop("externo")
+    assert ModeloProcesso.de_dict(d).p.sistemas[0].externo is False

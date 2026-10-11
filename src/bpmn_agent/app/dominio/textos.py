@@ -28,7 +28,8 @@ def resumo(m: ModeloProcesso) -> str:
     if p.sistemas:
         linhas.append("Sistemas (não são participantes):")
         for s in p.sistemas:
-            linhas.append(f"- {s.nome}" + (f": {s.descricao}" if s.descricao else "")
+            linhas.append(f"- {s.nome}" + (" (externo, de terceiros)" if s.externo else "")
+                          + (f": {s.descricao}" if s.descricao else "")
                           + (f" | acesso: {s.integracao}" if s.integracao else "")
                           + (f" | operações: {'; '.join(s.operacoes)}" if s.operacoes else ""))
     linhas.append("Elementos:")

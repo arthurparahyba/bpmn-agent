@@ -36,6 +36,7 @@ COL_W, ROW_H = 170, 130
 POOL_X, POOL_Y = 100, 60
 POOL_HEADER, LANE_HEADER = 30, 30
 MARGEM_X = 40
+CAIXA_W, CAIXA_H = 200, 40   # sistemas de terceiros
 
 
 def _tam(tipo: str) -> tuple[int, int]:
@@ -96,9 +97,10 @@ def calcular_layout(m: ModeloProcesso) -> dict:
     topo += [i for i in ids if i not in topo]
 
     # 3) raias
+    raia_de = {i: m.raia_de(i) for i in ids}
     raias = list(p.participantes)
+    raias += [r for r in dict.fromkeys(raia_de.values()) if r and r not in raias]   # sistemas da empresa
     usar_raias = bool(raias)
-    raia_de = {i: (m.raia_de(i) if usar_raias else "") for i in ids}
     if usar_raias and any(not r for r in raia_de.values()):
         raias.append("")  # raia "sem responsável"
     if not usar_raias:
@@ -169,8 +171,25 @@ def calcular_layout(m: ModeloProcesso) -> dict:
             pts = [(sx + sw, scy), (mx, scy), (mx, tcy), (tx, tcy)]
         rotas[f.id] = pts
 
+    # 8) sistemas de terceiros: uma caixa (piscina recolhida) para cada um, abaixo do processo, ligada por
+    #    seta de mensagem aos passos que o usam
+    externos = [s.nome for s in p.sistemas if s.externo and any(e.sistema == s.nome for e in p.elementos.values())]
+    caixas, mensagens = {}, {}
+    topo_caixas = pool[1] + pool[3] + 50
+    for k, nome in enumerate(externos):
+        cx0 = POOL_X + POOL_HEADER + k * (CAIXA_W + 30)
+        caixas[nome] = (cx0, topo_caixas, CAIXA_W, CAIXA_H)
+    for n, nome in enumerate(externos):
+        bx, by, bw, bh = caixas[nome]
+        for e in p.elementos.values():
+            if e.sistema != nome:
+                continue
+            x, y, w, h = pos[e.id]
+            tcx = x + w / 2
+            corredor = pool[1] + pool[3] + 14 + 8 * n          # desvio horizontal, escalonado por sistema
+            mensagens[(e.id, nome)] = [(tcx, y + h), (tcx, corredor), (bx + bw / 2, corredor), (bx + bw / 2, by)]
     return {"pos": pos, "rotas": rotas, "lanes": lanes_geo, "pool": pool,
-            "raia_de": raia_de, "usar_raias": usar_raias}
+            "raia_de": raia_de, "usar_raias": usar_raias, "caixas": caixas, "mensagens": mensagens}
 
 
 # ---------------------------------------------------------------------- XML
@@ -187,6 +206,15 @@ def gerar_bpmn_xml(m: ModeloProcesso) -> str:
     collab = ET.SubElement(defs, _q("bpmn", "collaboration"), {"id": "Collaboration_1"})
     ET.SubElement(collab, _q("bpmn", "participant"),
                   {"id": "Participant_1", "name": p.nome, "processRef": "Process_1"})
+
+    caixa_ids = {nome: f"Participant_{n}" for n, nome in enumerate(lay["caixas"], 2)}
+    for nome, pid in caixa_ids.items():
+        ET.SubElement(collab, _q("bpmn", "participant"), {"id": pid, "name": nome})
+    mensagem_ids = {}
+    for n, (elem_id, nome) in enumerate(lay["mensagens"], 1):
+        mensagem_ids[(elem_id, nome)] = f"MessageFlow_{n}"
+        ET.SubElement(collab, _q("bpmn", "messageFlow"), {"id": mensagem_ids[(elem_id, nome)], "name": "",
+                                                          "sourceRef": elem_id, "targetRef": caixa_ids[nome]})
 
     proc = ET.SubElement(defs, _q("bpmn", "process"), {"id": "Process_1", "name": p.nome, "isExecutable": "false"})
     if p.descricao:
@@ -250,6 +278,14 @@ def gerar_bpmn_xml(m: ModeloProcesso) -> str:
             lbl = ET.SubElement(s, _q("bpmndi", "BPMNLabel"))
             ET.SubElement(lbl, _q("dc", "Bounds"), {"x": _n(x + w / 2 - 50), "y": _n(y + h + 5),
                                                      "width": "100", "height": "27"})
+
+    for nome, geo in lay["caixas"].items():
+        shape(caixa_ids[nome], *geo, isHorizontal="true")
+    for chave, pts in lay["mensagens"].items():
+        ed = ET.SubElement(plano, _q("bpmndi", "BPMNEdge"),
+                           {"id": f"{mensagem_ids[chave]}_di", "bpmnElement": mensagem_ids[chave]})
+        for (x, y) in pts:
+            ET.SubElement(ed, _q("di", "waypoint"), {"x": _n(x), "y": _n(y)})
 
     for f in p.fluxos:
         pts = lay["rotas"][f.id]

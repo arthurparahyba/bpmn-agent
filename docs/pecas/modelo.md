@@ -85,6 +85,7 @@ classDiagram
         descricao
         integracao
         operacoes: lista de textos
+        externo: sim se for de terceiros
     }
     class Fluxo {
         id
@@ -163,7 +164,7 @@ ler e se corrigir, por exemplo:
 | `remover_participante(nome)` | Remove; os passos dele ficam sem responsável. |
 | `adicionar_elemento(...)` | Cria um elemento já ligado ao anterior. Veja abaixo. |
 | `atualizar_elemento(ref, ...)` | Muda nome, tipo, responsável, descrição, sistema ou operação. Campo vazio não muda. `nenhum` tira o responsável ou o sistema. |
-| `cadastrar_sistema(nome, ...)` | Cadastra um sistema ou completa um existente (sem duplicar, ignorando acento e maiúsculas). |
+| `cadastrar_sistema(nome, ...)` | Cadastra um sistema ou completa um existente (sem duplicar, ignorando acento e maiúsculas). `externo="sim"` marca um sistema de terceiros. |
 | `renomear_sistema(atual, novo)` | Troca o nome e acompanha os passos. Recusa nome de outro sistema ou de participante. |
 | `remover_sistema(nome)` | Tira do catálogo e limpa o sistema dos passos que o usavam. |
 | `remover_elemento(ref, reconectar)` | Remove e, se der, liga quem vinha antes a quem vinha depois. |
@@ -251,7 +252,13 @@ aprendida pelo sistema. Regras do modelo:
 - Aparecem no `resumo()` (seção "Sistemas"), na `narrativa()` e na documentação de cada passo no `.bpmn`
   (`Sistema: X — operação`). No desenho, o sistema também aparece como **segunda linha do nome** do passo
   (`[Sistema de Apólices]`), só em tarefas, para dar para ler sem abrir o documento; o nome guardado no modelo
-  não muda. Arquivos `processo.json` antigos, sem esses campos, continuam abrindo.
+  não muda.
+- **Onde o sistema aparece no desenho** (segue a prática de Signavio/Visual Paradigm): sistema **da empresa**
+  vira raia, mas só para passo automático **sem responsável** (o fim/decisão ao lado herda a raia); sistema
+  **de terceiros** (`externo`) vira uma **caixa separada** abaixo do processo, ligada por seta de mensagem
+  (`messageFlow`) a cada passo que o usa. Passo em sistema de terceiros sem responsável continua pedindo um
+  responsável (quem da empresa aciona). Essas raias existem só no desenho: não entram em `participantes`.
+  Arquivos `processo.json` antigos, sem esses campos, continuam abrindo.
 
 ## Em que raia cada coisa aparece: `raia_de(id)` (em `analise.py`)
 

@@ -65,6 +65,7 @@ class Sistema:
     descricao: str = ""
     integracao: str = ""       # como se acessa: tela, API REST, arquivo, fila...
     operacoes: list[str] = field(default_factory=list)   # telas/endpoints conhecidos
+    externo: bool = False      # True: sistema de terceiros (fora da empresa); aparece como caixa separada no desenho
 
 
 @dataclass

@@ -169,7 +169,8 @@ class ModeloProcesso:
         if s and operacao and not any(_normalizar(o) == _normalizar(operacao) for o in s.operacoes):
             s.operacoes.append(operacao)
 
-    def cadastrar_sistema(self, nome: str, descricao: str = "", integracao: str = "", operacoes: str = "") -> str:
+    def cadastrar_sistema(self, nome: str, descricao: str = "", integracao: str = "", operacoes: str = "",
+                          externo: str = "") -> str:
         """Cadastra um sistema do processo ou completa um que já existe (campos vazios não mudam)."""
         if not nome.strip():
             raise ErroModelo("Informe o nome do sistema.")
@@ -188,6 +189,8 @@ class ModeloProcesso:
         for o in self._lista(operacoes):
             if not any(_normalizar(x) == _normalizar(o) for x in s.operacoes):
                 s.operacoes.append(o)
+        if externo.strip():
+            s.externo = _normalizar(externo) in {"sim", "s", "true", "externo", "terceiro", "de fora"}
         return f"Sistema '{s.nome}' {'atualizado' if existente else 'cadastrado'} ({len(s.operacoes)} operação(ões) conhecida(s))."
 
     def renomear_sistema(self, atual: str, novo: str) -> str:

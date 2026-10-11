@@ -56,7 +56,7 @@ passo é `responsavel`; o sistema usado é `sistema`.
 
 | Tool | Parâmetros | Para que a LLM usa |
 |---|---|---|
-| `cadastrar_sistema` | `nome`, `descricao`, `integracao`, `operacoes` | Cadastrar um sistema (para que serve, como se acessa, telas/chamadas separadas por `;`) ou completar um que já existe. Campos vazios não mudam. |
+| `cadastrar_sistema` | `nome`, `descricao`, `integracao`, `operacoes`, `externo` | Cadastrar um sistema (para que serve, como se acessa, telas/chamadas separadas por `;`) ou completar um que já existe. Campos vazios não mudam. |
 | `renomear_sistema` | `atual`, `novo` | "Na verdade o Serasa chama Bureau de Crédito." Troca o nome no catálogo e em todos os passos; recusa nome já usado por outro sistema ou por um participante. |
 | `remover_sistema` | `nome` | Tirar do catálogo; os passos que o usavam ficam sem sistema. |
 

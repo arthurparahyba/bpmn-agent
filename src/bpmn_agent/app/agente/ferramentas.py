@@ -42,10 +42,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         descricao: Annotated[str, "Para que serve, em uma frase"] = "",
         integracao: Annotated[str, "Como é acessado: tela, API REST, arquivo, fila..."] = "",
         operacoes: Annotated[str, "Telas ou chamadas conhecidas, separadas por ';' (ex.: 'POST /contas; GET /saldo')"] = "",
+        externo: Annotated[str, "'sim' se for de fora da empresa (terceiro, ex.: Serasa, OpenAI, banco); 'nao' se for da empresa"] = "",
     ) -> str:
         """Cadastra um sistema que o processo usa ou integra (ou completa um já cadastrado). Sistemas não são
         participantes: quem faz o passo é `responsavel`, o sistema usado é `sistema`."""
-        return m().cadastrar_sistema(nome, descricao, integracao, operacoes)
+        return m().cadastrar_sistema(nome, descricao, integracao, operacoes, externo)
 
     @tool
     def renomear_sistema(atual: str, novo: str) -> str:
