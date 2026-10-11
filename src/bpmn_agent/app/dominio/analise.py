@@ -58,10 +58,14 @@ def problemas(m: ModeloProcesso) -> list[str]:
     return msgs
 
 
+# Passos que um sistema faz sozinho: automático e envio (e-mail, notificação...).
+PASSOS_DE_SISTEMA = {"serviceTask", "sendTask"}
+
+
 def _raia_do_sistema(m: ModeloProcesso, e) -> str:
-    """Passo automático sem responsável, feito num sistema DA EMPRESA: a raia leva o nome do sistema.
+    """Passo automático ou de envio, sem responsável, feito num sistema DA EMPRESA: a raia leva o nome do sistema.
     (Sistema de terceiros não vira raia: é desenhado como uma caixa separada, ver exportar_bpmn.)"""
-    if e.responsavel or e.tipo != "serviceTask" or not e.sistema:
+    if e.responsavel or e.tipo not in PASSOS_DE_SISTEMA or not e.sistema:
         return ""
     s = next((x for x in m.p.sistemas if x.nome == e.sistema), None)
     return e.sistema if s and not s.externo else ""

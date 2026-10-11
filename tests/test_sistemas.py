@@ -261,3 +261,13 @@ def test_aviso_de_conclusao_tambem_vale_quando_a_fala_so_pergunta_se_esta_corret
     m.adicionar_elemento("tarefa", "B", depois_de="A")
     assert aviso_de_conclusao(m, "Fechei o fluxo. Está correto ou quer mudar algum passo?") != ""
     assert aviso_de_conclusao(m, "Quem faz o passo B?") == ""
+
+
+def test_passo_de_envio_sem_responsavel_num_sistema_da_empresa_tambem_vai_para_a_raia_do_sistema():
+    m = ModeloProcesso()
+    m.adicionar_participante("Cliente")
+    m.cadastrar_sistema("PISCINARIA")
+    m.adicionar_elemento("tarefa_pessoa", "Pedir limpeza", "Cliente")
+    m.adicionar_elemento("envio", "Enviar notificação ao cliente", "", depois_de="Pedir limpeza", sistema="PISCINARIA")
+    assert m.raia_de("Passo_2") == "PISCINARIA"
+    assert not any("Enviar notificação" in x and "sem responsável" in x for x in m.problemas())
