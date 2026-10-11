@@ -104,6 +104,17 @@ cadastro automático ao citar no passo, separação entre sistema e participante
 trocar/tirar o sistema do passo, passo que executa num sistema e chama outro (raia + seta), duas chamadas repetidas, renomear (e recusar conflitos), remover com desfazer, aviso de sistema deduzido, pontos em aberto, resumo/narrativa/`.bpmn`
 leitura de JSON antigo, raia por sistema da empresa e caixa separada com seta de mensagem para sistema de terceiros.
 
+### `test_condicoes.py`
+
+Conversão de valor em número e unidade (`60 dias`, `R$ 1 milhão`, `4%`...), regra com condição estruturada
+(texto, catálogo de dados, alias de operador, recusa de condição incompleta, remover regra), JSON/BPMN e arquivo
+antigo, e o aviso de volta para dentro de um bloco paralelo.
+
+### `test_desenho.py`
+
+Layout do BPMN: nenhuma seta atravessa um elemento, saídas da mesma decisão em corredores diferentes, rótulos
+que não tocam em linhas, elementos nem outros rótulos, e uma cor por sistema de terceiros (caixa e setas).
+
 ### `test_api.py`
 
 Testa as rotas com o `TestClient` do FastAPI, que chama a API em memória, sem abrir porta

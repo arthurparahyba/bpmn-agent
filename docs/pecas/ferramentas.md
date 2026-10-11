@@ -81,7 +81,7 @@ passo é `responsavel`; o sistema usado é `sistema`.
 
 | Tool | Parâmetros | Para que a LLM usa |
 |---|---|---|
-| `adicionar_regra` | `id`, `regra` | Prazos, limites, documentos exigidos. |
+| `adicionar_regra` | `id`, `regra`, `campo`, `op`, `valor`, `acao` | Prazos, limites, documentos exigidos. Quando a regra é um se-então claro, os quatro últimos guardam a condição estruturada (juntos; ver [modelo.md](modelo.md)). |
 | `remover_regra` | `id`, `numero` | Tirar uma regra (numeração começa em 1). |
 | `anotar_pendencia` | `texto` | Guardar uma pergunta para depois. |
 | `resolver_pendencia` | `numero` | Riscar a pendência quando for respondida. |

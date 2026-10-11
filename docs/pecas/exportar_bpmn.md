@@ -116,8 +116,22 @@ Todas as setas são feitas de trechos horizontais e verticais. A regra depende d
 | Volta, na mesma altura | Contorna por baixo dos dois elementos. |
 | Volta, para cima ou para baixo | Usa um corredor logo acima ou abaixo da origem. |
 
-O rótulo de uma conexão fica colado no começo da seta. O nome de uma decisão fica acima e
-à esquerda do losango, para não bater nas saídas.
+**Desvio de elementos.** Depois de traçar o caminho padrão, o layout confere se algum segmento passa por dentro
+de outro elemento (`_cruza`). Se passar, tenta descer ou subir pelo vão entre duas colunas (onde nunca há
+elemento); para dois elementos na mesma linha com um terceiro no meio, contorna por baixo (ou por cima).
+
+**Saídas da mesma decisão.** Se duas ou mais setas saem de uma decisão para o mesmo lado (cima ou baixo), a
+primeira sai pelo vértice e as outras pela direita, cada uma num corredor próprio (22 px de distância), para
+não irem juntas.
+
+**Rótulos das setas.** Cada rótulo ("Sim", "Não", "Acima de R$ 1 milhão") procura um lugar encostado na SUA
+linha, em vários pontos de cada trecho, de um lado ou do outro, e só aceita um lugar que não toque em nenhuma
+outra seta (nem nas pontilhadas dos sistemas de terceiros), em nenhum elemento e em nenhum outro rótulo. A
+caixa do rótulo tem a largura do texto, porque o texto fica centrado nela. O nome de uma decisão fica acima e
+à esquerda do losango.
+
+**Sistemas de terceiros.** Cada um tem a sua cor (`bioc:stroke`, que o bpmn-js entende) na caixa e em todas as
+setas de mensagem dele; os corredores horizontais do rodapé ficam a 16 px uns dos outros.
 
 ## O que `calcular_layout` devolve
 
@@ -132,9 +146,11 @@ O rótulo de uma conexão fica colado no começo da seta. O nome de uma decisão
 
 ## Limitações conhecidas
 
-- Vários caminhos saindo da mesma decisão para a mesma raia podem se cruzar.
-- Uma volta longa pode passar por cima de elementos de colunas intermediárias.
-- Rótulos longos de conexão podem se sobrepor.
+- O desvio só considera elementos: uma seta pode cruzar OUTRA seta (normal em BPMN), e as pontilhadas dos
+  sistemas de terceiros atravessam as raias na vertical.
+- Uma volta longa ainda usa a regra antiga e pode passar por cima de elementos de colunas intermediárias.
+- Se não houver lugar livre para um rótulo, ele fica no começo da seta, mesmo que toque em algo.
+- O nome de uma decisão (o texto ao lado do losango) não passa pela busca de lugar livre.
 
 ## Quem usa
 

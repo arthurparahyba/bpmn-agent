@@ -80,6 +80,7 @@ classDiagram
         sistema: onde o passo é executado
         operacao: tela ou chamada
         chama: sistema de fora que ele aciona
+        condicoes: lista de Condicao
     }
     class Sistema {
         nome
@@ -87,6 +88,17 @@ classDiagram
         integracao
         operacoes: lista de textos
         externo: sim se for de terceiros
+    }
+    class Condicao {
+        campo: nome de um Dado
+        op: = != < <= > >= contem em
+        valor: numero ou texto
+        unidade: dias, %, BRL...
+        acao
+        regra: texto da regra
+    }
+    class Dado {
+        nome
     }
     class Fluxo {
         id
@@ -98,6 +110,8 @@ classDiagram
     Processo --> "muitos" Elemento
     Processo --> "muitos" Fluxo
     Processo --> "muitos" Sistema
+    Processo --> "muitos" Dado
+    Elemento --> "muitos" Condicao
 ```
 
 - **`Processo`** é o dado puro. **`ModeloProcesso`** é o `Processo` mais a pilha do
@@ -173,7 +187,7 @@ ler e se corrigir, por exemplo:
 | `conectar(origem, destino, rotulo)` | Liga dois elementos existentes. Usada para voltas e para juntar caminhos. |
 | `desconectar(origem, destino)` | Remove uma conexão. |
 | `rotular_conexao(origem, destino, rotulo)` | Muda o texto de uma conexão. |
-| `adicionar_regra(ref, regra)` / `remover_regra(ref, numero)` | Regras de um elemento. A numeração começa em 1. |
+| `adicionar_regra(ref, regra, campo, op, valor, acao)` / `remover_regra(ref, numero)` | Regras de um elemento. A numeração começa em 1. Com `campo`, `op` e `valor` (juntos), guarda também a condição estruturada. Remover a regra remove a condição. |
 | `anotar_pendencia(texto)` / `resolver_pendencia(numero)` | Lembretes do agente. |
 | `desfazer()` | Volta à cópia anterior. |
 | `recomecar()` | Apaga tudo (e dá para desfazer). |
@@ -236,10 +250,26 @@ para decidir o que perguntar. O que é verificado:
 | Passo sem responsável, havendo participantes | "... está sem responsável." |
 | Passo automático sem sistema | "... é automático, mas não sabemos em qual sistema." |
 | Dois passos com a mesma chamada, executor e responsável | "'A' e 'B' usam a mesma chamada (...); se for o mesmo passo, junte os dois." |
+| Seta de fora que entra no meio de um bloco "ao mesmo tempo" | "'A' volta para dentro de um bloco "ao mesmo tempo" ('B'); a volta deve ir para o início do bloco ('C')." |
 | Sistema cadastrado que nenhum passo usa | "O sistema '...' está cadastrado, mas nenhum passo o usa." |
 
 Início, fim, decisão, paralelo e espera **não** são cobrados por responsável: não são
 trabalho de alguém.
+
+## Condições estruturadas e dados
+
+Uma regra continua sendo um texto (`Elemento.regras`). Quando é um se-então claro (limite, valor, status,
+prazo), a LLM também informa `campo`, `op`, `valor` e `acao`, e o modelo guarda uma `Condicao` ligada ao texto
+da regra, para um programa ler: `quando idade do cliente < 18 → exigir assinatura`.
+
+- `op` é um de `= != < <= > >= contem em` (aceita `==`, `≥`, `≤`, `≠`, `<>`).
+- `valor` é separado em número e unidade quando o texto começa por número: `"60 dias"` vira `60` + `dias`;
+  `"R$ 1 milhão"` vira `1000000` + `BRL`; `"4%"` vira `4` + `%`. Texto como `"aprovado"` fica texto.
+- Parâmetros fixos (alíquotas, limites) também viram condição: campo `alíquota do ITCMD`, op `=`, valor `4%`.
+- `campo` é um **Dado** do catálogo `Processo.dados`: citar um campo novo o cadastra, e o mesmo nome com outra
+  grafia (maiúscula, acento) reaproveita o já cadastrado. O catálogo aparece no `resumo()` para a LLM reutilizar
+  os nomes. É por jornada: nomes diferentes entre jornadas (ou sinônimos) não são unificados.
+- Aparecem no `resumo()`, na `narrativa()` e na documentação do passo no `.bpmn`.
 
 ## Sistemas
 

@@ -8,7 +8,7 @@ import re
 from typing import TYPE_CHECKING
 
 from bpmn_agent.app.dominio.analise import problemas
-from bpmn_agent.app.dominio.processo import ROTULO_LEGIVEL, TIPO_AMIGAVEL, Elemento, _normalizar
+from bpmn_agent.app.dominio.processo import ROTULO_LEGIVEL, TIPO_AMIGAVEL, Elemento, _normalizar, texto_condicao
 
 if TYPE_CHECKING:
     from bpmn_agent.app.dominio.modelo import ModeloProcesso
@@ -32,6 +32,9 @@ def resumo(m: ModeloProcesso) -> str:
                           + (f": {s.descricao}" if s.descricao else "")
                           + (f" | acesso: {s.integracao}" if s.integracao else "")
                           + (f" | operações: {'; '.join(s.operacoes)}" if s.operacoes else ""))
+    if p.dados:
+        linhas.append("Dados usados nas condições (reutilize estes nomes em `campo`): "
+                      + "; ".join(d.nome for d in p.dados))
     linhas.append("Elementos:")
     for e in p.elementos.values():
         info = f"- {e.id} [{TIPO_AMIGAVEL.get(e.tipo, e.tipo)}] '{e.nome}'"
@@ -44,7 +47,7 @@ def resumo(m: ModeloProcesso) -> str:
         if e.descricao:
             info += f" | obs: {e.descricao}"
         for i, r in enumerate(e.regras, 1):
-            info += f"\n    regra {i}: {r}"
+            info += f"\n    regra {i}: {r}" + _cond(e, r, " [", "]")
         linhas.append(info)
     linhas.append("Conexões:")
     for f in p.fluxos:
@@ -66,6 +69,11 @@ MIN_ELEMENTOS_PARA_AVISAR = 3
 _FECHAMENTO = re.compile(r"esta(?:ria)? (?:tudo )?(?:correto|certo)|ficou (?:certo|correto)|quer (?:mudar|alterar|ajustar)"
                          r"|mais alguma (?:alteracao|mudanca|coisa|duvida)|deseja (?:mudar|alterar|ajustar)")
 _CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição", "o sistema", "a operação no sistema", "o sistema chamado")
+
+
+def _cond(e: Elemento, regra: str, abre: str, fecha: str) -> str:
+    c = next((x for x in e.condicoes if x.regra == regra), None)
+    return abre + texto_condicao(c) + fecha if c else ""
 
 
 def assinatura(e: Elemento) -> tuple:
@@ -163,7 +171,7 @@ def narrativa(m: ModeloProcesso) -> str:
         if e.chama:
             partes.append(f"   - Chama: {e.chama}" + (f" — {e.operacao}" if e.operacao else ""))
         for r in e.regras:
-            partes.append(f"   - Regra: {r}")
+            partes.append(f"   - Regra: {r}" + _cond(e, r, " (", ")"))
         for f in m.saidas(e.id):
             cond = f"se **{f.rotulo}**, " if f.rotulo else ""
             partes.append(f"   - {cond}segue para: {nome(f.destino)}")

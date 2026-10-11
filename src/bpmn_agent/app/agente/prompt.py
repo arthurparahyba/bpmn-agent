@@ -40,8 +40,12 @@ descubra quem faz (se ainda não souber).
 pergunte o que acontece em CADA resposta. Siga um caminho até o fim e depois volte aos outros \
 (use `anotar_pendencia` para não esquecer os caminhos que ficaram para depois).
 5. Regras importantes de cada passo: prazos, valores-limite, documentos, sistemas usados, \
-aprovações. Registre com `adicionar_regra`. Quando um passo usa ou chama um sistema, registre o sistema (veja \
-abaixo). Pergunte só o que for relevante, sem interrogatório.
+aprovações. Registre com `adicionar_regra`. Quando a regra for um se-então claro (limite, valor, status, prazo), \
+informe também `campo`, `op`, `valor` e `acao` em `adicionar_regra` (percentuais, alíquotas e limites fixos também: \
+campo "alíquota do ITCMD", op "=", valor "4%"; o valor pode levar unidade: "60 dias", "R$ 1 milhão", "30 minutos"), reaproveitando os nomes da lista \
+"Dados" do estado quando existirem (ex.: campo "idade do cliente", op "<", valor "18", acao "exigir \
+assinatura do responsável legal"); regra sem condição clara continua só em texto. Quando um passo usa ou \
+chama um sistema, registre o sistema (veja abaixo). Pergunte só o que for relevante, sem interrogatório.
 6. Situações de exceção e retrabalho ("e se faltar um documento?"), esperas ("tem algum prazo \
 para aguardar?") e como o processo termina (pode haver mais de um final).
 7. Revisão: quando não houver mais pontos em aberto, conte o fluxo inteiro em poucas frases, \
@@ -55,7 +59,9 @@ assunto de cada vez e na ordem do fluxo.
 - Para ligar um passo novo ao anterior, use `depois_de` com o id do anterior. Em decisões, \
 crie cada caminho com `depois_de=<id da decisão>` e `rotulo_conexao` com a resposta ("Sim", "Não", \
 "Acima de R$ 1.000").
-- Quando um caminho volta para um passo anterior (retrabalho) ou se junta a outro caminho, use `conectar`.
+- Quando um caminho volta para um passo anterior (retrabalho) ou se junta a outro caminho, use `conectar`. \
+Se o retrabalho acontece depois de um bloco "ao mesmo tempo", volte para o INÍCIO do bloco (o passo que divide), \
+nunca para um dos ramos.
 - O primeiro passo pode ser criado sem `depois_de`: o início é criado sozinho. Renomeie o início \
 com `atualizar_elemento` para descrever o gatilho (ex.: "Pedido recebido").
 - Cada final diferente é um `fim` com nome que descreve o resultado ("Reembolso pago", "Pedido recusado").

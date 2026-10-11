@@ -46,6 +46,39 @@ def _normalizar(texto: str) -> str:
     return " ".join(texto.lower().split())
 
 
+# Comparações aceitas numa condição (o que aparece em `op`).
+OPERADORES = ("=", "!=", "<", "<=", ">", ">=", "contem", "em")
+ALIAS_OPERADOR = {"==": "=", "≠": "!=", "≥": ">=", "≤": "<=", "<>": "!=", "contém": "contem"}
+
+
+@dataclass
+class Condicao:
+    """Uma regra com se-então que um programa consegue ler: quando <campo> <op> <valor>, então <acao>."""
+    campo: str                 # nome de um Dado do catálogo (Processo.dados)
+    op: str                    # um de OPERADORES
+    valor: int | float | str = ""   # número quando o texto começa por número ("60 dias" -> 60), senão o texto
+    unidade: str = ""               # "dias", "%", "BRL"... ("" se não houver)
+    acao: str = ""             # o que acontece quando a condição é verdadeira
+    regra: str = ""            # o texto da regra a que esta condição pertence (Elemento.regras)
+
+
+@dataclass
+class Dado:
+    """Uma informação que as regras consultam (idade do cliente, valor da compra...). Vira parâmetro depois."""
+    nome: str
+    descricao: str = ""
+
+
+def valor_legivel(c: Condicao) -> str:
+    if c.unidade == "BRL":
+        return f"R$ {c.valor}"
+    return f"{c.valor} {c.unidade}".strip()
+
+
+def texto_condicao(c: Condicao) -> str:
+    return f"quando {c.campo} {c.op} {valor_legivel(c)}" + (f" → {c.acao}" if c.acao else "")
+
+
 @dataclass
 class Elemento:
     id: str
@@ -57,6 +90,7 @@ class Elemento:
     sistema: str = ""          # sistema do catálogo (Processo.sistemas) em que o passo é executado
     operacao: str = ""         # tela/chamada usada; vale para `chama` se houver, senão para `sistema`
     chama: str = ""            # outro sistema que o passo aciona (em geral de terceiros), ex.: o Gateway
+    condicoes: list[Condicao] = field(default_factory=list)   # versão estruturada de algumas das `regras`
 
 
 @dataclass
@@ -83,6 +117,7 @@ class Processo:
     descricao: str = ""
     participantes: list[str] = field(default_factory=list)
     sistemas: list[Sistema] = field(default_factory=list)
+    dados: list[Dado] = field(default_factory=list)
     elementos: dict[str, Elemento] = field(default_factory=dict)
     fluxos: list[Fluxo] = field(default_factory=list)
     pendencias: list[str] = field(default_factory=list)

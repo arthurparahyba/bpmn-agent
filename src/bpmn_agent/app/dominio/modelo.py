@@ -12,11 +12,13 @@ analise.py e textos.py; gravar em disco fica em app/persistencia.py.
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import asdict
 
 from bpmn_agent.app.dominio import analise, textos
 from bpmn_agent.app.dominio.processo import (
-    GATEWAYS, PREFIXO, TIPOS, Elemento, ErroModelo, Fluxo, Processo, Sistema, _normalizar,
+    ALIAS_OPERADOR, GATEWAYS, OPERADORES, PREFIXO, TIPOS, Condicao, Dado, Elemento, ErroModelo, Fluxo, Processo,
+    Sistema, _normalizar, texto_condicao,
 )
 
 
@@ -427,11 +429,66 @@ class ModeloProcesso:
         return f"Rótulo da conexão {o.id} -> {d.id} agora é '{f.rotulo}'."
 
     # --------------------------------------------------------- regras
-    def adicionar_regra(self, ref: str, regra: str) -> str:
+    def _resolver_dado(self, nome: str) -> str:
+        """Nome canônico de um dado do catálogo; se ainda não existe, é cadastrado."""
+        nome = (nome or "").strip()
+        existente = next((d for d in self.p.dados if _normalizar(d.nome) == _normalizar(nome)), None)
+        if existente:
+            return existente.nome
+        self.p.dados.append(Dado(nome=nome))
+        return nome
+
+    _MULTIPLICADOR = {"mil": 1_000, "milhao": 1_000_000, "milhão": 1_000_000, "milhoes": 1_000_000,
+                      "milhões": 1_000_000, "bilhao": 1_000_000_000, "bilhão": 1_000_000_000,
+                      "bilhoes": 1_000_000_000, "bilhões": 1_000_000_000}
+
+    @classmethod
+    def _valor_unidade(cls, texto: str) -> tuple[int | float | str, str]:
+        """Separa número e unidade quando o texto começa por número: "60 dias" -> (60, "dias"),
+        "R$ 1 milhão" -> (1000000, "BRL"), "4%" -> (4, "%"), "aprovado" -> ("aprovado", "")."""
+        s = (texto or "").strip()
+        m = re.fullmatch(r"(r\$\s*)?(-?\d[\d.]*(?:,\d+)?)\s*(milh[aã]o|milh[oõ]es|bilh[aã]o|bilh[oõ]es|mil)?\s*(.*)",
+                         s.lower())
+        if not m:
+            return s, ""
+        moeda, numero, mult, resto = m.groups()
+        if "," in numero:
+            numero = numero.replace(".", "").replace(",", ".")
+        elif re.fullmatch(r"-?\d{1,3}(\.\d{3})+", numero):
+            numero = numero.replace(".", "")
+        try:
+            valor = float(numero)
+        except ValueError:
+            return s, ""
+        valor *= cls._MULTIPLICADOR.get(mult or "", 1)
+        valor = int(valor) if valor == int(valor) else valor
+        unidade = resto.strip()
+        if (moeda and not unidade) or unidade in {"reais", "de reais", "real", "r$"}:
+            unidade = "BRL"
+        return valor, unidade
+
+    def adicionar_regra(self, ref: str, regra: str, campo: str = "", op: str = "", valor: str = "",
+                        acao: str = "") -> str:
+        """Registra a regra em texto. Com `campo`, `op` e `valor`, guarda também a condição estruturada
+        (quando campo op valor, então acao), que um programa consegue ler."""
         e = self.resolver(ref)
+        estruturada = any(x.strip() for x in (campo, op, valor))
+        if estruturada:
+            op_ok = ALIAS_OPERADOR.get(op.strip(), _normalizar(op))
+            if not (campo.strip() and op.strip() and valor.strip()):
+                raise ErroModelo("Para guardar a condição, informe `campo`, `op` e `valor` juntos "
+                                 "(ou nenhum dos três, se a regra não tiver uma condição clara).")
+            if op_ok not in OPERADORES:
+                raise ErroModelo(f"Operador '{op}' inválido. Use um de: {', '.join(OPERADORES)}.")
         self._snapshot()
         e.regras.append(regra.strip())
-        return f"Regra registrada em {e.id} (agora são {len(e.regras)})."
+        msg = f"Regra registrada em {e.id} (agora são {len(e.regras)})."
+        if estruturada:
+            num, unidade = self._valor_unidade(valor)
+            e.condicoes.append(Condicao(campo=self._resolver_dado(campo), op=op_ok, valor=num, unidade=unidade,
+                                        acao=acao.strip(), regra=regra.strip()))
+            msg += f" Condição guardada: {texto_condicao(e.condicoes[-1])}."
+        return msg
 
     def remover_regra(self, ref: str, numero: int) -> str:
         e = self.resolver(ref)
@@ -439,6 +496,7 @@ class ModeloProcesso:
             raise ErroModelo(f"{e.id} tem {len(e.regras)} regra(s); número {numero} inválido.")
         self._snapshot()
         r = e.regras.pop(numero - 1)
+        e.condicoes = [c for c in e.condicoes if c.regra != r]
         return f"Regra removida de {e.id}: '{r}'."
 
     # --------------------------------------------------------- pendências
@@ -494,7 +552,9 @@ class ModeloProcesso:
             descricao=d.get("descricao", ""),
             participantes=list(d.get("participantes", [])),
             sistemas=[Sistema(**s) for s in d.get("sistemas", [])],
-            elementos={k: Elemento(**v) for k, v in d.get("elementos", {}).items()},
+            dados=[Dado(**x) for x in d.get("dados", [])],
+            elementos={k: Elemento(**{**v, "condicoes": [Condicao(**c) for c in v.get("condicoes", [])]})
+                       for k, v in d.get("elementos", {}).items()},
             fluxos=[Fluxo(**f) for f in d.get("fluxos", [])],
             pendencias=list(d.get("pendencias", [])),
             contadores=dict(d.get("contadores", {})),

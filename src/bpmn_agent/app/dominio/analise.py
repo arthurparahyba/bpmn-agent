@@ -42,6 +42,7 @@ def problemas(m: ModeloProcesso) -> list[str]:
             msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
         if e.tipo == "serviceTask" and not e.sistema and not e.chama:
             msgs.append(f"{e.id} '{e.nome}' é automático, mas não sabemos em qual sistema.")
+    msgs += _voltas_para_dentro_de_paralelo(m)
     usados = {e.sistema for e in els.values()} | {e.chama for e in els.values()}
     vistos: dict[tuple, str] = {}
     for e in els.values():   # a mesma chamada, do mesmo executor e do mesmo responsável, em dois passos
@@ -60,6 +61,30 @@ def problemas(m: ModeloProcesso) -> list[str]:
 
 # Passos que um sistema faz sozinho: automático e envio (e-mail, notificação...).
 PASSOS_DE_SISTEMA = {"serviceTask", "sendTask"}
+
+
+def _voltas_para_dentro_de_paralelo(m: ModeloProcesso) -> list[str]:
+    """Uma seta de FORA que entra no meio de um bloco paralelo (entre o "ao mesmo tempo" que divide e o que junta):
+    a junção espera todos os ramos e o processo trava ou duplica. O certo é voltar ao início do bloco."""
+    els = m.p.elementos
+    avisos = []
+    for p_id, p in els.items():
+        if p.tipo != "parallelGateway" or len(m.saidas(p_id)) < 2 or len(m.entradas(p_id)) > 1:
+            continue
+        regiao, fila = set(), [f.destino for f in m.saidas(p_id)]
+        while fila:
+            n = fila.pop()
+            if n in regiao or n == p_id:
+                continue
+            regiao.add(n)
+            if els[n].tipo == "parallelGateway" and len(m.entradas(n)) > 1:
+                continue            # a junção fecha o bloco
+            fila += [f.destino for f in m.saidas(n)]
+        for f in m.p.fluxos:
+            if f.destino in regiao and f.origem not in regiao and f.origem != p_id and els[f.destino].tipo != "parallelGateway":
+                avisos.append(f"'{els[f.origem].nome}' volta para dentro de um bloco \"ao mesmo tempo\" "
+                              f"('{els[f.destino].nome}'); a volta deve ir para o início do bloco ('{p.nome}').")
+    return avisos
 
 
 def _raia_do_sistema(m: ModeloProcesso, e) -> str:

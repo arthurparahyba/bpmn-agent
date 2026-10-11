@@ -158,9 +158,15 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
     def adicionar_regra(
         id: Annotated[str, "Id do elemento"],
         regra: Annotated[str, "Regra de negócio, prazo, limite, documento exigido, sistema usado..."],
+        campo: Annotated[str, "Se a regra tem uma condição clara: a informação consultada, ex.: 'idade do cliente'. Reuse os nomes de Dados do estado"] = "",
+        op: Annotated[str, "Comparação: = != < <= > >= contem em"] = "",
+        valor: Annotated[str, "Com o que se compara, ex.: '18', 'aprovado', '10 minutos'"] = "",
+        acao: Annotated[str, "O que acontece quando a condição é verdadeira, ex.: 'exigir assinatura do responsável legal'"] = "",
     ) -> str:
-        """Registra uma regra de negócio em um passo ou decisão (vai para a documentação do BPMN)."""
-        return m().adicionar_regra(id, regra)
+        """Registra uma regra de negócio em um passo ou decisão (vai para a documentação do BPMN). Se a regra for
+        um se-então claro (limite, valor, status), informe também campo, op, valor e acao: ficam guardados de forma
+        estruturada, para virar parâmetro depois."""
+        return m().adicionar_regra(id, regra, campo, op, valor, acao)
 
     @tool
     def remover_regra(id: str, numero: Annotated[int, "Número da regra (começa em 1)"]) -> str:
