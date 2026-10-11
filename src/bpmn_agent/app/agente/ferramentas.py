@@ -27,6 +27,16 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         return sessao.modelo
 
     @tool
+    def pedir_confirmacao(
+        motivo: Annotated[str, "O que não bate com o desenho atual, em uma frase"],
+        pedido: Annotated[str, "O pedido da pessoa, com as palavras dela, para aplicar se ela confirmar"],
+    ) -> str:
+        """Segura um pedido que não combina com o desenho (cita algo que não existe, contradiz o que já
+        está desenhado ou troca algo importante sem motivo claro). Não altera o diagrama: depois de
+        chamar, explique a dúvida e pergunte se é isso mesmo."""
+        return sessao.pedir_confirmacao(motivo, pedido)
+
+    @tool
     def definir_processo(
         nome: Annotated[str, "Nome curto do processo, ex.: 'Reembolso de despesas'"] = "",
         descricao: Annotated[str, "Objetivo do processo em uma frase"] = "",
@@ -153,5 +163,5 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         definir_processo, adicionar_participante, renomear_participante, remover_participante,
         adicionar_elemento, atualizar_elemento, remover_elemento, mover_elemento,
         conectar, desconectar, rotular_conexao, adicionar_regra, remover_regra,
-        anotar_pendencia, resolver_pendencia, desfazer, recomecar_diagrama,
+        anotar_pendencia, resolver_pendencia, desfazer, recomecar_diagrama, pedir_confirmacao,
     ]

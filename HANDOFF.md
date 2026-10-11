@@ -22,7 +22,7 @@ diagrama BPMN aos poucos. Requisitos originais do dono do projeto:
 |---|---|---|
 | Modelo do processo + 17 operações + desfazer + validação | `src/bpmn_agent/app/dominio/modelo.py` | ✅ testado |
 | Exportação BPMN 2.0 com DI e layout automático | `src/bpmn_agent/app/exportacao/exportar_bpmn.py` | ✅ 0 avisos no bpmn-moddle, conferido visualmente |
-| 17 tools para o LLM | `src/bpmn_agent/app/agente/ferramentas.py` | ✅ esquemas aceitos por OpenAI-compat, Anthropic e Gemini |
+| 18 tools para o LLM | `src/bpmn_agent/app/agente/ferramentas.py` | ✅ esquemas aceitos por OpenAI-compat, Anthropic e Gemini |
 | Prompt de entrevista + saudação | `src/bpmn_agent/app/agente/prompt.py` | ✅ testado em conversa real com `claude-haiku-5-5` |
 | Grafo LangGraph | `app/agente/grafo.py` | ✅ testado com LLM roteirizada |
 | `Sessao` + gravação em disco | `app/sessao.py`, `app/persistencia.py` | ✅ testado com LLM roteirizada |

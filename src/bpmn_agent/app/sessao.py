@@ -6,6 +6,7 @@ A API conversa só com esta classe: envia o texto do usuário e recebe um Respos
 """
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,8 +18,20 @@ from langgraph.checkpoint.memory import MemorySaver
 from bpmn_agent.app.agente.grafo import LIMITE_PASSOS_GRAFO, construir_grafo, texto_de
 from bpmn_agent.app.agente.prompt import SAUDACAO
 from bpmn_agent.app.dominio import ModeloProcesso
+from bpmn_agent.app.dominio.processo import _normalizar
 from bpmn_agent.app.exportacao.exportar_bpmn import gerar_bpmn_xml
 from bpmn_agent.app.persistencia import salvar_artefatos
+
+# Respostas que valem como comando quando há uma alteração aguardando confirmação.
+# Qualquer outra mensagem descarta a pendência e é tratada como um pedido novo.
+CONFIRMACOES = {"sim", "s", "confirmo", "confirmar", "confirmado", "pode", "pode sim", "pode aplicar",
+                "aplica", "aplicar", "isso", "isso mesmo", "ok", "claro"}
+CANCELAMENTOS = {"nao", "n", "cancelar", "cancela", "cancelado", "deixa", "deixa pra la", "esquece",
+                 "ignora", "nao precisa", "nao quero"}
+
+
+def _comando(texto: str) -> str:
+    return _normalizar(re.sub(r"[^\w\s]", "", texto or ""))
 
 
 @dataclass
@@ -37,6 +50,10 @@ class Sessao:
         self.pasta = Path(pasta) / self.id
         self.modelo = modelo or ModeloProcesso()
         self.checkpointer = MemorySaver()
+        # Alteração que o agente achou incoerente com o desenho: fica guardada, sem ser aplicada,
+        # até a pessoa confirmar ou cancelar. `pedido_liberado` vale só durante o turno da confirmação.
+        self.pendente: dict[str, str] | None = None
+        self.pedido_liberado: str = ""
         self.grafo = construir_grafo(llm, self, self.checkpointer)
         self.config = {"configurable": {"thread_id": self.id}, "recursion_limit": LIMITE_PASSOS_GRAFO}
         saudacao = SAUDACAO if not self.modelo.p.elementos else (
@@ -45,7 +62,30 @@ class Sessao:
         self.grafo.update_state(self.config, {"messages": [AIMessage(content=saudacao)]}, as_node="agente")
 
     # ----------------------------------------------------------------- conversa
+    def pedir_confirmacao(self, motivo: str, pedido: str) -> str:
+        """Guarda um pedido incoerente sem aplicá-lo. Chamada pela ferramenta `pedir_confirmacao`."""
+        if self.pedido_liberado:
+            return "ERRO: a pessoa já confirmou este pedido. Aplique-o agora com as ferramentas de edição."
+        if not motivo.strip() or not pedido.strip():
+            return "ERRO: informe o motivo da dúvida e o pedido original da pessoa."
+        self.pendente = {"motivo": motivo.strip(), "pedido": pedido.strip()}
+        return ("Nada foi alterado. Explique à pessoa, em uma frase simples, o que não bateu com o desenho "
+                "e pergunte se é isso mesmo que ela quer. Não use mais ferramentas neste turno.")
+
     def enviar(self, texto_usuario: str) -> RespostaTurno:
+        if self.pendente:
+            pend, self.pendente = self.pendente, None
+            comando = _comando(texto_usuario)
+            if comando in CANCELAMENTOS:
+                return RespostaTurno(texto="Tudo bem, não mudei nada. O que acontece em seguida?")
+            if comando in CONFIRMACOES:
+                self.pedido_liberado = pend["pedido"]
+        try:
+            return self._enviar(texto_usuario)
+        finally:
+            self.pedido_liberado = ""
+
+    def _enviar(self, texto_usuario: str) -> RespostaTurno:
         antes = {i: (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao)
                  for i, e in self.modelo.p.elementos.items()}
         fluxos_antes = {(f.origem, f.destino, f.rotulo) for f in self.modelo.p.fluxos}

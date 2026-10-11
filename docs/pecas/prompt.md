@@ -37,7 +37,7 @@ atualizado.
 | **Abertura** | Quem ela é (analista paciente) e com quem fala (alguém que conhece o próprio trabalho, mas não conhece notação de processos). |
 | **Como conversar** | Português simples, mensagens curtas, uma pergunta por vez, confirmar o que entendeu antes de perguntar, não inventar passos, não mostrar ids, confirmar quando a resposta a "A ou B?" não disser qual. Traz a lista de palavras a evitar. |
 | **Roteiro** | A ordem da entrevista em sete etapas (abaixo). |
-| **Como usar as ferramentas** | Atualizar o desenho assim que souber de algo, como usar `depois_de` e `rotulo_conexao`, quando usar `conectar`, padrão de nomes, como atender pedidos de mudança, o que fazer quando uma tool devolve erro. |
+| **Como usar as ferramentas** | Atualizar o desenho assim que souber de algo, como usar `depois_de` e `rotulo_conexao`, quando usar `conectar`, padrão de nomes, como atender pedidos de mudança, o que fazer quando uma tool devolve erro, e quando chamar `pedir_confirmacao` (pedido que cita algo inexistente ou contradiz o desenho: não editar, perguntar). |
 | **Estado atual** | O espaço `{estado}`, preenchido com o resumo do processo. |
 
 ### O roteiro da entrevista
@@ -63,6 +63,9 @@ BPMN, gateway, raia, lane, pool, evento, fluxo de sequência, instância, token.
 
 Esses termos existem no código e nesta documentação, mas não devem aparecer nas falas do
 agente nem nos textos da interface.
+
+`CONFIRMACAO_RECEBIDA` não faz parte do `SYSTEM_PROMPT`: `grafo.py` a acrescenta ao final só no
+turno em que a pessoa confirmou um pedido guardado, com o pedido original dentro.
 
 ## Quem usa
 

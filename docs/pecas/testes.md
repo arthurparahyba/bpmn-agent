@@ -67,6 +67,11 @@ tudo o que recebeu, o que permite conferir o que o nó `agente` enviou.
 |---|---|
 | `test_turno_com_ferramentas_atualiza_diagrama` | Um turno com quatro tools (uma com erro proposital) altera o processo, devolve o erro em `acoes`, marca os `alterados`, grava os arquivos, envia o estado **atualizado** na segunda chamada e começa a conversa pelo usuário. |
 | `test_desfazer_pelo_agente` | A tool `desfazer` reverte a alteração do turno anterior. |
+| `test_pedido_incoerente_fica_pendente_e_nao_altera_o_desenho` | `pedir_confirmacao` guarda o pedido, uma tool de edição chamada junto é barrada pelo grafo e o diagrama não muda. |
+| `test_confirmar_aplica_o_pedido_guardado` | "Sim!" libera o pedido: o prompt do turno traz o pedido original e a edição é aplicada. |
+| `test_cancelar_descarta_sem_chamar_o_llm` | "não" descarta a pendência sem chamar a LLM. |
+| `test_outra_mensagem_descarta_a_pendencia_e_vira_pedido_novo` | Qualquer outra resposta descarta a pendência e segue como pedido novo. |
+| `test_nao_pede_confirmacao_de_novo_depois_de_confirmado` | No turno da confirmação, `pedir_confirmacao` é recusada. |
 | `test_cortar_historico_comeca_em_mensagem_do_usuario` | O corte do histórico sempre começa em uma mensagem do usuário. |
 
 ## Como escrever um teste novo do agente

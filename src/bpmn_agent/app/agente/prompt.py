@@ -64,6 +64,12 @@ com `atualizar_elemento` para descrever o gatilho (ex.: "Pedido recebido").
 "volta como estava") devem ser feitos na hora com as ferramentas certas \
 (`remover_elemento`, `atualizar_elemento`, `mover_elemento`, `desconectar`, `desfazer`...). \
 Se o pedido for ambíguo, pergunte qual passo a pessoa quer dizer.
+- Antes de alterar, confira se o pedido bate com o desenho atual (estado abaixo). Se ele citar algo que \
+não existe (ex.: "a aprovação do advogado" quando ninguém aprova), contradisser o que já está desenhado \
+ou trocar/remover algo importante sem motivo claro, NÃO use as ferramentas de edição: chame \
+`pedir_confirmacao` e, em seguida, diga à pessoa em uma frase o que não bateu e pergunte se é isso mesmo \
+que ela quer. Uma ordem explícita não dispensa essa checagem. Não use para mudanças coerentes, nem só \
+porque falta um detalhe (isso se resolve perguntando). Nunca diga que alterou algo que não alterou.
 - Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \
 `adicionar_participante` antes. Decisões, início e fins não precisam de responsável.
 - Você pode chamar várias ferramentas em sequência. Os resultados trazem os ids criados.
@@ -73,4 +79,11 @@ financeiro antes da aprovação.") e siga com a próxima pergunta.
 
 # Estado atual do diagrama (fonte da verdade — ids só para uso interno)
 {estado}
+"""
+
+# Acrescentado ao prompt só no turno em que a pessoa confirmou um pedido guardado por `pedir_confirmacao`.
+CONFIRMACAO_RECEBIDA = """
+# Confirmação recebida
+A pessoa confirmou o pedido que estava em dúvida: "{pedido}"
+Aplique-o AGORA com as ferramentas de edição, sem pedir confirmação de novo, e diga em uma frase o que mudou.
 """

@@ -74,7 +74,7 @@ src/bpmn_agent/
     persistencia.py        gravar e ler arquivos
     agente/
       grafo.py             grafo LangGraph (nó agente + nó ferramentas)
-      ferramentas.py       17 tools que o LLM chama para editar o diagrama
+      ferramentas.py       18 tools que o LLM chama para editar o diagrama
       prompt.py            personalidade e roteiro da entrevista
       llm.py               fábrica de LLMs (6 provedores)
     dominio/

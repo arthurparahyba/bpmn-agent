@@ -29,7 +29,7 @@ flowchart LR
 
 ## Como as tools são criadas
 
-`criar_ferramentas(sessao)` devolve a lista das 17 tools. Elas são funções definidas
+`criar_ferramentas(sessao)` devolve a lista das 18 tools. Elas são funções definidas
 **dentro** dessa função, então cada uma "lembra" a sessão que recebeu (isso se chama
 closure). Resultado: duas conversas abertas ao mesmo tempo têm cada uma o seu conjunto de
 tools, mexendo cada uma no seu processo.
@@ -38,7 +38,7 @@ O decorador `@tool` do LangChain transforma a função em tool: o nome da funç�
 da tool, o texto logo abaixo (a docstring) vira a descrição, e os parâmetros com
 `Annotated[tipo, "explicação"]` viram a descrição de cada parâmetro.
 
-## As 17 tools
+## As 18 tools
 
 ### Sobre o processo e os participantes
 
@@ -76,6 +76,7 @@ da tool, o texto logo abaixo (a docstring) vira a descrição, e os parâmetros 
 | `resolver_pendencia` | `numero` | Riscar a pendência quando for respondida. |
 | `desfazer` | nenhum | "Volta como estava." |
 | `recomecar_diagrama` | nenhum | Apagar tudo e começar de novo. |
+| `pedir_confirmacao` | `motivo`, `pedido` | Segurar um pedido que não bate com o desenho (cita algo que não existe, contradiz o que já está desenhado). **Não altera o diagrama**: guarda o pedido na `Sessao` até a pessoa confirmar ou cancelar. Ver [sessao.md](sessao.md). |
 
 O parâmetro `tipo` de `adicionar_elemento` só aceita os dez valores da lista
 `TipoElemento` (`inicio`, `fim`, `tarefa`, `tarefa_pessoa`, `tarefa_sistema`,

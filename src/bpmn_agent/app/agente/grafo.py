@@ -20,7 +20,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from bpmn_agent.app.agente.ferramentas import criar_ferramentas
-from bpmn_agent.app.agente.prompt import SYSTEM_PROMPT
+from bpmn_agent.app.agente.prompt import CONFIRMACAO_RECEBIDA, SYSTEM_PROMPT
 from bpmn_agent.app.dominio import ErroModelo
 
 MAX_TURNOS_HISTORICO = 14   # turnos do usuário mantidos no contexto (o diagrama vai sempre inteiro)
@@ -56,7 +56,10 @@ def construir_grafo(llm: BaseChatModel, sessao, checkpointer=None):
     llm_com_ferramentas = llm.bind_tools(ferramentas)
 
     def agente(state: MessagesState):
-        sistema = SystemMessage(SYSTEM_PROMPT.format(estado=sessao.modelo.resumo()))
+        texto_sistema = SYSTEM_PROMPT.format(estado=sessao.modelo.resumo())
+        if sessao.pedido_liberado:
+            texto_sistema += CONFIRMACAO_RECEBIDA.format(pedido=sessao.pedido_liberado)
+        sistema = SystemMessage(texto_sistema)
         historico = cortar_historico(state["messages"])
         if historico and not isinstance(historico[0], HumanMessage):
             # alguns provedores (Anthropic, Gemini) exigem que a conversa comece pelo usuário
@@ -72,6 +75,10 @@ def construir_grafo(llm: BaseChatModel, sessao, checkpointer=None):
             try:
                 if ferramenta is None:
                     raise ErroModelo(f"Ferramenta '{chamada['name']}' não existe.")
+                if sessao.pendente and chamada["name"] != "pedir_confirmacao":
+                    # a trava é do código, não do prompt: nada muda enquanto a pessoa não decidir
+                    raise ErroModelo("Há um pedido aguardando confirmação da pessoa. Não altere o "
+                                     "diagrama agora; apenas pergunte se ela confirma.")
                 resultado = ferramenta.invoke(chamada["args"])
             except ErroModelo as e:
                 resultado = f"ERRO: {e}"

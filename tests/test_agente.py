@@ -73,6 +73,82 @@ def test_desfazer_pelo_agente(tmp_path):
     assert "Passo_1" not in s.modelo.p.elementos
 
 
+def _sessao_com_passo(tmp_path, *respostas):
+    """Sessão com um passo 'Pagar imposto' já desenhado e o LLM roteirizado para o que vem depois."""
+    llm = LLMRoteirizado(respostas=[
+        AIMessage(content="", tool_calls=[chamada("adicionar_elemento", {
+            "tipo": "tarefa_pessoa", "nome": "Pagar imposto", "responsavel": "Financeiro"}, 1)]),
+        AIMessage(content="ok"),
+        *respostas,
+    ])
+    s = Sessao(llm, pasta=tmp_path)
+    s.enviar("o financeiro paga o imposto")
+    return s, llm
+
+
+DUVIDA = AIMessage(content="", tool_calls=[
+    chamada("pedir_confirmacao", {"motivo": "Ninguém aprova o pagamento hoje",
+                                  "pedido": "o advogado aprova o pagamento"}, 10),
+    chamada("atualizar_elemento", {"id": "Passo_1", "nome": "Aprovar e pagar imposto"}, 11),  # deve ser barrada
+])
+PERGUNTA = AIMessage(content="Hoje ninguém aprova o pagamento. Você quer criar uma aprovação?")
+
+
+def test_pedido_incoerente_fica_pendente_e_nao_altera_o_desenho(tmp_path):
+    s, _ = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA)
+    r = s.enviar("quem aprova o pagamento é o advogado")
+
+    assert s.pendente == {"motivo": "Ninguém aprova o pagamento hoje", "pedido": "o advogado aprova o pagamento"}
+    assert s.modelo.p.elementos["Passo_1"].nome == "Pagar imposto"
+    assert any(a.startswith("atualizar_elemento: ERRO") for a in r.acoes)   # trava no código
+    assert r.alterados == []
+    assert "aprovação" in r.texto
+
+
+def test_confirmar_aplica_o_pedido_guardado(tmp_path):
+    aplica = AIMessage(content="", tool_calls=[chamada("atualizar_elemento", {
+        "id": "Passo_1", "nome": "Aprovar e pagar imposto"}, 20)])
+    s, llm = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA, aplica, AIMessage(content="Feito."))
+    s.enviar("quem aprova o pagamento é o advogado")
+    r = s.enviar("Sim!")
+
+    assert s.pendente is None and s.pedido_liberado == ""
+    assert s.modelo.p.elementos["Passo_1"].nome == "Aprovar e pagar imposto"
+    assert r.texto == "Feito."
+    # o prompt do turno da confirmação carrega o pedido original; os outros turnos não
+    assert "o advogado aprova o pagamento" in llm.vistos[-2][0].content
+    assert "Confirmação recebida" not in llm.vistos[0][0].content
+
+
+def test_cancelar_descarta_sem_chamar_o_llm(tmp_path):
+    s, llm = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA)   # nenhuma resposta sobrando: chamar o LLM falharia
+    s.enviar("quem aprova o pagamento é o advogado")
+    r = s.enviar("não")
+
+    assert s.pendente is None
+    assert s.modelo.p.elementos["Passo_1"].nome == "Pagar imposto"
+    assert "não mudei nada" in r.texto
+
+
+def test_outra_mensagem_descarta_a_pendencia_e_vira_pedido_novo(tmp_path):
+    s, _ = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA, AIMessage(content="Entendi, o gerente aprova."))
+    s.enviar("quem aprova o pagamento é o advogado")
+    r = s.enviar("na verdade quem aprova é o gerente")
+
+    assert s.pendente is None
+    assert r.texto == "Entendi, o gerente aprova."
+
+
+def test_nao_pede_confirmacao_de_novo_depois_de_confirmado(tmp_path):
+    de_novo = AIMessage(content="", tool_calls=[chamada("pedir_confirmacao", {"motivo": "x", "pedido": "y"}, 30)])
+    s, _ = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA, de_novo, AIMessage(content="ok"))
+    s.enviar("quem aprova o pagamento é o advogado")
+    r = s.enviar("confirmo")
+
+    assert s.pendente is None
+    assert any(a.startswith("pedir_confirmacao: ERRO") for a in r.acoes)
+
+
 def test_cortar_historico_comeca_em_mensagem_do_usuario():
     from langchain_core.messages import HumanMessage
     msgs = []

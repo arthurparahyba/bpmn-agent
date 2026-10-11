@@ -45,6 +45,7 @@ flowchart TB
 |---|---|
 | `__init__(llm, pasta, modelo, id)` | Cria o grafo e registra a saudação como primeira mensagem. Se veio um `modelo` já preenchido, a saudação é "Oi de novo! Carreguei o processo...". |
 | `enviar(texto)` | Roda um turno. Devolve `RespostaTurno`. |
+| `pedir_confirmacao(motivo, pedido)` | Chamado pela tool de mesmo nome. Guarda em `pendente` um pedido incoerente com o desenho, sem aplicá-lo. No turno da confirmação, recusa novo pedido de confirmação. |
 | `desfazer()` | Desfaz a última alteração do processo, sem passar pela LLM, e regrava os arquivos. |
 | `mensagens()` | Todas as mensagens guardadas, incluindo pedidos e resultados de tools. |
 | `historico_visivel()` | Só as falas, como pares `(papel, texto)`. É o que a interface mostra. |
@@ -66,6 +67,23 @@ flowchart TB
 ```
 
 O passo 2 é onde tudo acontece; o detalhe está em [grafo.md](grafo.md).
+
+### Pedido em dúvida (`pendente`)
+
+Quando a LLM acha que um pedido não combina com o desenho, ela chama a tool `pedir_confirmacao`
+em vez das tools de edição e pergunta à pessoa. A `Sessao` guarda o pedido em `pendente` e
+`enviar` trata a resposta seguinte **no código, sem a LLM decidir**:
+
+| Resposta da pessoa | O que acontece |
+|---|---|
+| "sim", "confirmo", "pode"... (`CONFIRMACOES`) | O pedido guardado vai em `pedido_liberado` e o prompt do turno ganha a seção "Confirmação recebida"; a LLM aplica. Nesse turno, `pedir_confirmacao` é recusada. |
+| "não", "cancelar", "deixa"... (`CANCELAMENTOS`) | Descarta a pendência e responde "não mudei nada", sem chamar a LLM. |
+| qualquer outra coisa | Descarta a pendência e trata a mensagem como um pedido novo. |
+
+Enquanto `pendente` existe, `grafo.py` devolve erro para qualquer tool que não seja
+`pedir_confirmacao`: nada muda no diagrama antes da decisão. A pendência fica só na memória
+(como a pilha do desfazer) e não é gravada em arquivo. Detectar a incoerência continua sendo
+trabalho da LLM (probabilístico); o código só garante que nada é aplicado antes da decisão.
 
 ### `RespostaTurno`
 
