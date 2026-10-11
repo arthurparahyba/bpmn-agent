@@ -99,7 +99,7 @@ class Sessao:
         texto = falas[-1] if falas else "Pronto, atualizei o desenho. O que acontece em seguida?"
         if acoes:   # houve ferramentas: o código confere e mostra o que mudou de fato, sem confiar na fala da LLM
             texto = self._anexar_mudancas(estado["messages"], texto,
-                                          resumo_mudancas(antes, fluxos_antes, self.modelo))
+                                          resumo_mudancas(antes, fluxos_antes, self.modelo, texto_usuario=texto_usuario))
 
         depois = self.modelo.p.elementos
         alterados = [i for i, e in depois.items()

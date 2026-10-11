@@ -164,6 +164,7 @@ ler e se corrigir, por exemplo:
 | `adicionar_elemento(...)` | Cria um elemento já ligado ao anterior. Veja abaixo. |
 | `atualizar_elemento(ref, ...)` | Muda nome, tipo, responsável, descrição, sistema ou operação. Campo vazio não muda. `nenhum` tira o responsável ou o sistema. |
 | `cadastrar_sistema(nome, ...)` | Cadastra um sistema ou completa um existente (sem duplicar, ignorando acento e maiúsculas). |
+| `renomear_sistema(atual, novo)` | Troca o nome e acompanha os passos. Recusa nome de outro sistema ou de participante. |
 | `remover_sistema(nome)` | Tira do catálogo e limpa o sistema dos passos que o usavam. |
 | `remover_elemento(ref, reconectar)` | Remove e, se der, liga quem vinha antes a quem vinha depois. |
 | `mover_elemento(ref, depois_de)` | Tira do lugar (fechando o buraco) e insere depois de outro. Não move decisões. |
@@ -266,7 +267,9 @@ aparece como ponto em aberto, porque aí falta mesmo uma informação.
 
 Compara uma "foto" do processo tirada antes do turno com o processo depois e devolve uma frase como
 `O que mudou de fato no desenho: 3 item(ns) novo(s): ...; alterado(s): Pagar imposto (a descrição); ligações: +2 / -0.`
-Sem mudança, diz `nada`. É calculada pelo código, sem a LLM. Quem a usa é a `Sessao` (ver [sessao.md](sessao.md)).
+Sem mudança, diz `nada`. É calculada pelo código, sem a LLM. Se a `Sessao` passa o texto da pessoa, acrescenta
+`sistema deduzido, não dito por você (confirme): X em Y` quando um passo ganhou um sistema que a mensagem não
+cita (nem o nome, nem uma palavra de pelo menos 3 letras dele, nem a operação). Quem a usa é a `Sessao` (ver [sessao.md](sessao.md)).
 
 ## Duas descrições em texto (em `textos.py`)
 

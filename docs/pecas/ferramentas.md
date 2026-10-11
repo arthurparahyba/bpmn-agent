@@ -29,7 +29,7 @@ flowchart LR
 
 ## Como as tools são criadas
 
-`criar_ferramentas(sessao)` devolve a lista das 20 tools. Elas são funções definidas
+`criar_ferramentas(sessao)` devolve a lista das 21 tools. Elas são funções definidas
 **dentro** dessa função, então cada uma "lembra" a sessão que recebeu (isso se chama
 closure). Resultado: duas conversas abertas ao mesmo tempo têm cada uma o seu conjunto de
 tools, mexendo cada uma no seu processo.
@@ -38,7 +38,7 @@ O decorador `@tool` do LangChain transforma a função em tool: o nome da funç�
 da tool, o texto logo abaixo (a docstring) vira a descrição, e os parâmetros com
 `Annotated[tipo, "explicação"]` viram a descrição de cada parâmetro.
 
-## As 20 tools
+## As 21 tools
 
 ### Sobre o processo e os participantes
 
@@ -57,6 +57,7 @@ passo é `responsavel`; o sistema usado é `sistema`.
 | Tool | Parâmetros | Para que a LLM usa |
 |---|---|---|
 | `cadastrar_sistema` | `nome`, `descricao`, `integracao`, `operacoes` | Cadastrar um sistema (para que serve, como se acessa, telas/chamadas separadas por `;`) ou completar um que já existe. Campos vazios não mudam. |
+| `renomear_sistema` | `atual`, `novo` | "Na verdade o Serasa chama Bureau de Crédito." Troca o nome no catálogo e em todos os passos; recusa nome já usado por outro sistema ou por um participante. |
 | `remover_sistema` | `nome` | Tirar do catálogo; os passos que o usavam ficam sem sistema. |
 
 ### Sobre os elementos

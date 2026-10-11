@@ -99,7 +99,7 @@ tools consome pelo menos duas: a que pede as tools e a que responde em texto. Us
 
 Catálogo de sistemas: cadastrar e completar sem duplicar, nome canônico e operação aprendida,
 cadastro automático ao citar no passo, separação entre sistema e participante (nos dois sentidos),
-trocar/tirar o sistema do passo, remover com desfazer, pontos em aberto, resumo/narrativa/`.bpmn`
+trocar/tirar o sistema do passo, renomear (e recusar conflitos), remover com desfazer, aviso de sistema deduzido, pontos em aberto, resumo/narrativa/`.bpmn`
 e leitura de JSON antigo.
 
 ### `test_api.py`

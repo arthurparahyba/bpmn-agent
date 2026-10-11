@@ -190,6 +190,25 @@ class ModeloProcesso:
                 s.operacoes.append(o)
         return f"Sistema '{s.nome}' {'atualizado' if existente else 'cadastrado'} ({len(s.operacoes)} operação(ões) conhecida(s))."
 
+    def renomear_sistema(self, atual: str, novo: str) -> str:
+        s = self._achar_sistema(atual)
+        if not s:
+            raise ErroModelo(f"Sistema '{atual}' não existe. Existentes: {[x.nome for x in self.p.sistemas]}")
+        if not novo.strip():
+            raise ErroModelo("Informe o novo nome do sistema.")
+        outro = self._achar_sistema(novo)
+        if outro and outro is not s:
+            raise ErroModelo(f"Já existe um sistema '{outro.nome}'. Para juntar os dois, mude o sistema dos "
+                             "passos com `atualizar_elemento` e remova um deles.")
+        if any(_normalizar(p) == _normalizar(novo) for p in self.p.participantes):
+            raise ErroModelo(f"'{novo}' já é um participante (quem faz passos); use outro nome.")
+        self._snapshot()
+        antigo, s.nome = s.nome, novo.strip()
+        for e in self.p.elementos.values():
+            if e.sistema == antigo:
+                e.sistema = s.nome
+        return f"Sistema '{antigo}' renomeado para '{s.nome}' (e em todos os passos dele)."
+
     def remover_sistema(self, nome: str) -> str:
         s = self._achar_sistema(nome)
         if not s:

@@ -84,7 +84,8 @@ passo é uma pessoa ou área; o sistema é onde ou com o que ela faz. Cadastre c
 que serve, como se acessa e telas/chamadas, quando a pessoa disser) e indique em cada passo com `sistema` \
 (e `operacao`, se souber). Num passo automático, `responsavel` é a área dona do passo e `sistema` é quem o \
 executa; pergunte em qual sistema ele roda se não souberem dizer. Use sempre o nome já cadastrado, sem \
-criar variações. Aprovações, prazos e limites continuam sendo regras (`adicionar_regra`), não sistemas.
+criar variações (para trocar o nome, use `renomear_sistema`). Só ligue um passo a um sistema que a \
+pessoa disse; se ela falou só "o sistema" ou não disse qual, pergunte em qual, em vez de supor. Aprovações, prazos e limites continuam sendo regras (`adicionar_regra`), não sistemas.
 - Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \
 `adicionar_participante` antes. Decisões, início e fins não precisam de responsável.
 - Você pode chamar várias ferramentas em sequência. Os resultados trazem os ids criados.

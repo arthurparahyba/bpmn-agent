@@ -48,6 +48,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         return m().cadastrar_sistema(nome, descricao, integracao, operacoes)
 
     @tool
+    def renomear_sistema(atual: str, novo: str) -> str:
+        """Renomeia um sistema do catálogo (e em todos os passos que o usam)."""
+        return m().renomear_sistema(atual, novo)
+
+    @tool
     def remover_sistema(nome: str) -> str:
         """Remove um sistema do catálogo. Os passos que o usavam ficam sem sistema."""
         return m().remover_sistema(nome)
@@ -184,5 +189,5 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         adicionar_elemento, atualizar_elemento, remover_elemento, mover_elemento,
         conectar, desconectar, rotular_conexao, adicionar_regra, remover_regra,
         anotar_pendencia, resolver_pendencia, desfazer, recomecar_diagrama, pedir_confirmacao,
-        cadastrar_sistema, remover_sistema,
+        cadastrar_sistema, renomear_sistema, remover_sistema,
     ]

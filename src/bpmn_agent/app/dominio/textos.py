@@ -4,10 +4,11 @@ e a narrativa em markdown para pessoas.
 """
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from bpmn_agent.app.dominio.analise import problemas
-from bpmn_agent.app.dominio.processo import ROTULO_LEGIVEL, TIPO_AMIGAVEL, Elemento
+from bpmn_agent.app.dominio.processo import ROTULO_LEGIVEL, TIPO_AMIGAVEL, Elemento, _normalizar
 
 if TYPE_CHECKING:
     from bpmn_agent.app.dominio.modelo import ModeloProcesso
@@ -64,9 +65,21 @@ def assinatura(e: Elemento) -> tuple:
     return (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao, e.sistema, e.operacao)
 
 
-def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: ModeloProcesso, limite: int = 5) -> str:
+def _citado(nomes: list[str], texto: str) -> bool:
+    """O texto da pessoa menciona algum destes nomes (ou uma palavra de pelo menos 3 letras de um deles)?"""
+    palavras = set(re.findall(r"\w+", _normalizar(texto)))
+    for n in nomes:
+        n = _normalizar(n)
+        if n and (n in _normalizar(texto) or any(len(w) >= 3 and w in palavras for w in n.split())):
+            return True
+    return False
+
+
+def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: ModeloProcesso, limite: int = 5,
+                    texto_usuario: str | None = None) -> str:
     """Frase com o que MUDOU DE FATO no desenho num turno, calculada pelo código (não pela LLM).
-    `antes` mapeia id -> assinatura(elemento); `fluxos_antes` tem (origem, destino, rotulo)."""
+    `antes` mapeia id -> assinatura(elemento); `fluxos_antes` tem (origem, destino, rotulo).
+    Com `texto_usuario`, avisa quando um passo ganhou um sistema que a pessoa não citou nesta mensagem."""
     p = m.p
     novos = [e.nome for i, e in p.elementos.items() if i not in antes]
     removidos = [a[0] for i, a in antes.items() if i not in p.elementos]
@@ -91,6 +104,14 @@ def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: Modelo
         partes.append(f"alterado(s): {lista(mudados)}")
     if ligacoes_novas or ligacoes_removidas:
         partes.append(f"ligações: +{ligacoes_novas} / -{ligacoes_removidas}")
+    if texto_usuario is not None:
+        deduzidos = []
+        for i, e in p.elementos.items():
+            if e.sistema and (i not in antes or antes[i][5] != e.sistema):
+                if not _citado([e.sistema, e.operacao], texto_usuario):
+                    deduzidos.append(f"{e.sistema} em {e.nome}")
+        if deduzidos:
+            partes.append("sistema deduzido, não dito por você (confirme): " + lista(deduzidos))
     return "O que mudou de fato no desenho: " + ("; ".join(partes) if partes else "nada") + "."
 
 

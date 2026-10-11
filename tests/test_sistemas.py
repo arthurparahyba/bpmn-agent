@@ -109,3 +109,32 @@ def test_json_guarda_e_carrega_sistemas_e_aceita_arquivo_antigo(tmp_path):
     for e in antigo["elementos"].values():
         e.pop("sistema"), e.pop("operacao")
     assert ModeloProcesso.de_dict(antigo).p.sistemas == []
+
+
+def test_renomear_sistema_atualiza_os_passos_e_recusa_conflitos():
+    m = com_core()
+    m.cadastrar_sistema("Serasa")
+    m.renomear_sistema("core bancario", "Core Banking")
+    assert m.p.elementos["Passo_1"].sistema == "Core Banking" and [s.nome for s in m.p.sistemas][0] == "Core Banking"
+    with pytest.raises(ErroModelo, match="Já existe um sistema"):
+        m.renomear_sistema("Core Banking", "serasa")
+    m.adicionar_participante("Backoffice")
+    with pytest.raises(ErroModelo, match="já é um participante"):
+        m.renomear_sistema("Serasa", "Backoffice")
+    assert [s.nome for s in m.p.sistemas] == ["Core Banking", "Serasa"]   # as tentativas recusadas não mudaram nada
+    m.renomear_sistema("Serasa", "Bureau")
+    m.desfazer()
+    assert [s.nome for s in m.p.sistemas] == ["Core Banking", "Serasa"]
+
+
+def test_resumo_avisa_sistema_deduzido_que_a_pessoa_nao_citou():
+    from bpmn_agent.app.dominio.textos import assinatura, resumo_mudancas
+    m = com_core()
+    antes = {i: assinatura(e) for i, e in m.p.elementos.items()}
+    m.adicionar_elemento("tarefa_sistema", "Enviar confirmação", "Backoffice", depois_de="Passo_1",
+                         sistema="Core Bancário")
+    dito = resumo_mudancas(antes, set(), m, texto_usuario="depois o core bancário envia a confirmação")
+    deduzido = resumo_mudancas(antes, set(), m, texto_usuario="depois o sistema envia a confirmação")
+    sem_texto = resumo_mudancas(antes, set(), m)
+    assert "deduzido" not in dito and "deduzido" not in sem_texto
+    assert "sistema deduzido, não dito por você (confirme): Core Bancário em Enviar confirmação" in deduzido
