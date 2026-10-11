@@ -95,6 +95,13 @@ Cada item de `respostas` é uma resposta da LLM, na ordem em que será pedida. U
 tools consome pelo menos duas: a que pede as tools e a que responde em texto. Use
 `tmp_path` como pasta, para o teste não escrever em `sessoes/`.
 
+### `test_sistemas.py`
+
+Catálogo de sistemas: cadastrar e completar sem duplicar, nome canônico e operação aprendida,
+cadastro automático ao citar no passo, separação entre sistema e participante (nos dois sentidos),
+trocar/tirar o sistema do passo, remover com desfazer, pontos em aberto, resumo/narrativa/`.bpmn`
+e leitura de JSON antigo.
+
 ### `test_api.py`
 
 Testa as rotas com o `TestClient` do FastAPI, que chama a API em memória, sem abrir porta

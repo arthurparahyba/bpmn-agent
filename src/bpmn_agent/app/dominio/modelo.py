@@ -16,7 +16,7 @@ from dataclasses import asdict
 
 from bpmn_agent.app.dominio import analise, textos
 from bpmn_agent.app.dominio.processo import (
-    GATEWAYS, PREFIXO, TIPOS, Elemento, ErroModelo, Fluxo, Processo, _normalizar,
+    GATEWAYS, PREFIXO, TIPOS, Elemento, ErroModelo, Fluxo, Processo, Sistema, _normalizar,
 )
 
 
@@ -86,6 +86,7 @@ class ModeloProcesso:
         for p in self.p.participantes:
             if _normalizar(p) == _normalizar(nome):
                 return p
+        self._recusar_se_for_sistema(nome, "responsável")
         # participante novo é criado automaticamente: reduz chamadas do agente
         self.p.participantes.append(nome)
         return nome
@@ -105,6 +106,7 @@ class ModeloProcesso:
             raise ErroModelo("Informe o nome do participante.")
         if any(_normalizar(p) == _normalizar(nome) for p in self.p.participantes):
             return f"'{nome}' já existe."
+        self._recusar_se_for_sistema(nome, "participante")
         self._snapshot()
         self.p.participantes.append(nome.strip())
         return f"Participante '{nome.strip()}' adicionado."
@@ -113,6 +115,7 @@ class ModeloProcesso:
         atual_ok = next((p for p in self.p.participantes if _normalizar(p) == _normalizar(atual)), None)
         if not atual_ok:
             raise ErroModelo(f"Participante '{atual}' não existe. Existentes: {self.p.participantes}")
+        self._recusar_se_for_sistema(novo, "participante")
         self._snapshot()
         i = self.p.participantes.index(atual_ok)
         self.p.participantes[i] = novo.strip()
@@ -134,6 +137,72 @@ class ModeloProcesso:
         extra = f" Passos que ficaram sem responsável: {afetados}." if afetados else ""
         return f"Participante '{alvo}' removido.{extra}"
 
+    # --------------------------------------------------------- sistemas
+    def _achar_sistema(self, nome: str) -> Sistema | None:
+        return next((s for s in self.p.sistemas if _normalizar(s.nome) == _normalizar(nome)), None)
+
+    def _recusar_se_for_sistema(self, nome: str, como: str) -> None:
+        if self._achar_sistema(nome):
+            raise ErroModelo(f"'{nome}' é um sistema do catálogo, não uma pessoa ou área; não pode ser {como}. "
+                             "Quem faz o passo vai em `responsavel`; o sistema usado vai em `sistema`.")
+
+    def _resolver_sistema(self, nome: str) -> str:
+        """Nome canônico de um sistema; se ainda não existe, é cadastrado (como acontece com participantes)."""
+        nome = (nome or "").strip()
+        if not nome:
+            return ""
+        s = self._achar_sistema(nome)
+        if s:
+            return s.nome
+        if any(_normalizar(p) == _normalizar(nome) for p in self.p.participantes):
+            raise ErroModelo(f"'{nome}' já é um participante (quem faz passos). Se for mesmo um sistema, "
+                             "use outro nome para ele ou remova o participante antes.")
+        self.p.sistemas.append(Sistema(nome=nome))
+        return nome
+
+    @staticmethod
+    def _lista(texto: str) -> list[str]:
+        return [x.strip() for x in (texto or "").replace("\n", ";").split(";") if x.strip()]
+
+    def _guardar_operacao(self, sistema: str, operacao: str) -> None:
+        s = self._achar_sistema(sistema)
+        if s and operacao and not any(_normalizar(o) == _normalizar(operacao) for o in s.operacoes):
+            s.operacoes.append(operacao)
+
+    def cadastrar_sistema(self, nome: str, descricao: str = "", integracao: str = "", operacoes: str = "") -> str:
+        """Cadastra um sistema do processo ou completa um que já existe (campos vazios não mudam)."""
+        if not nome.strip():
+            raise ErroModelo("Informe o nome do sistema.")
+        existente = self._achar_sistema(nome)
+        if not existente and any(_normalizar(p) == _normalizar(nome) for p in self.p.participantes):
+            raise ErroModelo(f"'{nome}' já é um participante (quem faz passos). Se for mesmo um sistema, "
+                             "use outro nome para ele ou remova o participante antes.")
+        self._snapshot()
+        s = existente or Sistema(nome=nome.strip())
+        if not existente:
+            self.p.sistemas.append(s)
+        if descricao:
+            s.descricao = descricao.strip()
+        if integracao:
+            s.integracao = integracao.strip()
+        for o in self._lista(operacoes):
+            if not any(_normalizar(x) == _normalizar(o) for x in s.operacoes):
+                s.operacoes.append(o)
+        return f"Sistema '{s.nome}' {'atualizado' if existente else 'cadastrado'} ({len(s.operacoes)} operação(ões) conhecida(s))."
+
+    def remover_sistema(self, nome: str) -> str:
+        s = self._achar_sistema(nome)
+        if not s:
+            raise ErroModelo(f"Sistema '{nome}' não existe. Existentes: {[x.nome for x in self.p.sistemas]}")
+        self._snapshot()
+        self.p.sistemas.remove(s)
+        afetados = [e.nome for e in self.p.elementos.values() if e.sistema == s.nome]
+        for e in self.p.elementos.values():
+            if e.sistema == s.nome:
+                e.sistema = e.operacao = ""
+        extra = f" Passos que ficaram sem sistema: {afetados}." if afetados else ""
+        return f"Sistema '{s.nome}' removido.{extra}"
+
     # --------------------------------------------------------- elementos
     def adicionar_elemento(
         self,
@@ -143,6 +212,8 @@ class ModeloProcesso:
         depois_de: str = "",
         rotulo_conexao: str = "",
         descricao: str = "",
+        sistema: str = "",
+        operacao: str = "",
     ) -> str:
         """
         Cria um elemento. Se `depois_de` for informado:
@@ -176,7 +247,10 @@ class ModeloProcesso:
             nome=nome.strip(),
             responsavel=self._resolver_participante(responsavel),
             descricao=descricao.strip(),
+            sistema=self._resolver_sistema(sistema),
+            operacao=operacao.strip() if sistema.strip() else "",
         )
+        self._guardar_operacao(novo.sistema, novo.operacao)
         self.p.elementos[novo.id] = novo
 
         if anterior:
@@ -196,9 +270,12 @@ class ModeloProcesso:
         return " ".join(mensagens)
 
     def atualizar_elemento(self, ref: str, nome: str = "", tipo: str = "",
-                           responsavel: str = "", descricao: str = "") -> str:
+                           responsavel: str = "", descricao: str = "",
+                           sistema: str = "", operacao: str = "") -> str:
         e = self.resolver(ref)
         novo_tipo = self._tipo_bpmn(tipo) if tipo else None
+        if operacao and not (sistema or e.sistema):
+            raise ErroModelo("Informe o `sistema` ao indicar a `operacao`.")
         self._snapshot()
         mudou = []
         if nome:
@@ -210,6 +287,16 @@ class ModeloProcesso:
             mudou.append("responsável")
         if descricao:
             e.descricao = descricao.strip(); mudou.append("descrição")
+        if sistema:
+            if _normalizar(sistema) in {"nenhum", "-"}:
+                e.sistema = e.operacao = ""
+            else:
+                e.sistema = self._resolver_sistema(sistema)
+            mudou.append("sistema")
+        if operacao:
+            e.operacao = "" if _normalizar(operacao) in {"nenhuma", "nenhum", "-"} else operacao.strip()
+            self._guardar_operacao(e.sistema, e.operacao)
+            mudou.append("operação")
         return f"{e.id} atualizado ({', '.join(mudou) or 'nada mudou'})."
 
     def remover_elemento(self, ref: str, reconectar: bool = True) -> str:
@@ -368,6 +455,7 @@ class ModeloProcesso:
             nome=d.get("nome", "Novo processo"),
             descricao=d.get("descricao", ""),
             participantes=list(d.get("participantes", [])),
+            sistemas=[Sistema(**s) for s in d.get("sistemas", [])],
             elementos={k: Elemento(**v) for k, v in d.get("elementos", {}).items()},
             fluxos=[Fluxo(**f) for f in d.get("fluxos", [])],
             pendencias=list(d.get("pendencias", [])),

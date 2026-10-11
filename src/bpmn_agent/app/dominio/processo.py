@@ -54,6 +54,17 @@ class Elemento:
     responsavel: str = ""      # nome do participante (raia); "" = sem raia
     descricao: str = ""
     regras: list[str] = field(default_factory=list)
+    sistema: str = ""          # nome de um sistema do catálogo (Processo.sistemas) usado neste passo
+    operacao: str = ""         # o que é feito nele: tela, API ou integração (ex.: "POST /contas")
+
+
+@dataclass
+class Sistema:
+    """Um sistema que o processo usa ou integra. Não é quem trabalha (isso é participante)."""
+    nome: str
+    descricao: str = ""
+    integracao: str = ""       # como se acessa: tela, API REST, arquivo, fila...
+    operacoes: list[str] = field(default_factory=list)   # telas/endpoints conhecidos
 
 
 @dataclass
@@ -69,6 +80,7 @@ class Processo:
     nome: str = "Novo processo"
     descricao: str = ""
     participantes: list[str] = field(default_factory=list)
+    sistemas: list[Sistema] = field(default_factory=list)
     elementos: dict[str, Elemento] = field(default_factory=dict)
     fluxos: list[Fluxo] = field(default_factory=list)
     pendencias: list[str] = field(default_factory=list)

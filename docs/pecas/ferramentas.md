@@ -29,7 +29,7 @@ flowchart LR
 
 ## Como as tools são criadas
 
-`criar_ferramentas(sessao)` devolve a lista das 18 tools. Elas são funções definidas
+`criar_ferramentas(sessao)` devolve a lista das 20 tools. Elas são funções definidas
 **dentro** dessa função, então cada uma "lembra" a sessão que recebeu (isso se chama
 closure). Resultado: duas conversas abertas ao mesmo tempo têm cada uma o seu conjunto de
 tools, mexendo cada uma no seu processo.
@@ -38,7 +38,7 @@ O decorador `@tool` do LangChain transforma a função em tool: o nome da funç�
 da tool, o texto logo abaixo (a docstring) vira a descrição, e os parâmetros com
 `Annotated[tipo, "explicação"]` viram a descrição de cada parâmetro.
 
-## As 18 tools
+## As 20 tools
 
 ### Sobre o processo e os participantes
 
@@ -49,12 +49,22 @@ da tool, o texto logo abaixo (a docstring) vira a descrição, e os parâmetros 
 | `renomear_participante` | `atual`, `novo` | "Na verdade o setor chama Controladoria." |
 | `remover_participante` | `nome` | Tirar um participante. |
 
+### Sobre os sistemas
+
+Sistemas (Core Bancário, SAP, Serasa...) ficam num catálogo próprio e **não são participantes**: quem faz o
+passo é `responsavel`; o sistema usado é `sistema`.
+
+| Tool | Parâmetros | Para que a LLM usa |
+|---|---|---|
+| `cadastrar_sistema` | `nome`, `descricao`, `integracao`, `operacoes` | Cadastrar um sistema (para que serve, como se acessa, telas/chamadas separadas por `;`) ou completar um que já existe. Campos vazios não mudam. |
+| `remover_sistema` | `nome` | Tirar do catálogo; os passos que o usavam ficam sem sistema. |
+
 ### Sobre os elementos
 
 | Tool | Parâmetros | Para que a LLM usa |
 |---|---|---|
-| `adicionar_elemento` | `tipo`, `nome`, `responsavel`, `depois_de`, `rotulo_conexao`, `descricao` | Criar passo, decisão, espera, início ou fim, já ligado ao anterior. |
-| `atualizar_elemento` | `id`, `nome`, `tipo`, `responsavel`, `descricao` | "Quem faz isso é o financeiro", "muda o nome para...". |
+| `adicionar_elemento` | `tipo`, `nome`, `responsavel`, `depois_de`, `rotulo_conexao`, `descricao`, `sistema`, `operacao` | Criar passo, decisão, espera, início ou fim, já ligado ao anterior. |
+| `atualizar_elemento` | `id`, `nome`, `tipo`, `responsavel`, `descricao`, `sistema`, `operacao` | "Quem faz isso é o financeiro", "muda o nome para...". |
 | `remover_elemento` | `id`, `reconectar` | "Tira esse passo." |
 | `mover_elemento` | `id`, `depois_de` | "Isso acontece antes da aprovação." |
 

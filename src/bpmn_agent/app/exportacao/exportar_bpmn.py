@@ -204,7 +204,9 @@ def gerar_bpmn_xml(m: ModeloProcesso) -> str:
 
     for e in p.elementos.values():
         no = ET.SubElement(proc, _q("bpmn", e.tipo), {"id": e.id, "name": e.nome})
-        doc = "\n".join(([e.descricao] if e.descricao else []) + [f"Regra: {r}" for r in e.regras])
+        doc = "\n".join(([e.descricao] if e.descricao else [])
+                        + ([f"Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao else "")] if e.sistema else [])
+                        + [f"Regra: {r}" for r in e.regras])
         if doc:
             ET.SubElement(no, _q("bpmn", "documentation")).text = doc
         for f in m.entradas(e.id):

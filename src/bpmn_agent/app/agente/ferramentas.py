@@ -37,6 +37,22 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         return sessao.pedir_confirmacao(motivo, pedido)
 
     @tool
+    def cadastrar_sistema(
+        nome: Annotated[str, "Nome do sistema, ex.: 'Core Bancário', 'SAP', 'Serasa'. Não é pessoa nem área"],
+        descricao: Annotated[str, "Para que serve, em uma frase"] = "",
+        integracao: Annotated[str, "Como é acessado: tela, API REST, arquivo, fila..."] = "",
+        operacoes: Annotated[str, "Telas ou chamadas conhecidas, separadas por ';' (ex.: 'POST /contas; GET /saldo')"] = "",
+    ) -> str:
+        """Cadastra um sistema que o processo usa ou integra (ou completa um já cadastrado). Sistemas não são
+        participantes: quem faz o passo é `responsavel`, o sistema usado é `sistema`."""
+        return m().cadastrar_sistema(nome, descricao, integracao, operacoes)
+
+    @tool
+    def remover_sistema(nome: str) -> str:
+        """Remove um sistema do catálogo. Os passos que o usavam ficam sem sistema."""
+        return m().remover_sistema(nome)
+
+    @tool
     def definir_processo(
         nome: Annotated[str, "Nome curto do processo, ex.: 'Reembolso de despesas'"] = "",
         descricao: Annotated[str, "Objetivo do processo em uma frase"] = "",
@@ -76,9 +92,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
             "vir depois do novo). Vazio só para o primeiro elemento")] = "",
         rotulo_conexao: Annotated[str, "Resposta/condição do caminho quando sai de uma decisão, ex.: 'Sim', 'Acima de R$ 1.000'"] = "",
         descricao: Annotated[str, "Detalhes úteis do passo (opcional)"] = "",
+        sistema: Annotated[str, "Sistema usado ou chamado neste passo (cadastrado sozinho se for novo)"] = "",
+        operacao: Annotated[str, "Tela ou chamada no sistema, ex.: 'POST /analise-credito' (opcional)"] = "",
     ) -> str:
         """Adiciona um passo, decisão, espera, início ou fim ao diagrama, já conectado ao anterior."""
-        return m().adicionar_elemento(tipo, nome, responsavel, depois_de, rotulo_conexao, descricao)
+        return m().adicionar_elemento(tipo, nome, responsavel, depois_de, rotulo_conexao, descricao, sistema, operacao)
 
     @tool
     def atualizar_elemento(
@@ -87,9 +105,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         tipo: Annotated[str, "Novo tipo (mesmos valores de adicionar_elemento)"] = "",
         responsavel: Annotated[str, "Novo responsável; 'nenhum' para tirar"] = "",
         descricao: str = "",
+        sistema: Annotated[str, "Sistema usado no passo; 'nenhum' para tirar"] = "",
+        operacao: Annotated[str, "Tela ou chamada no sistema; 'nenhuma' para tirar"] = "",
     ) -> str:
-        """Altera nome, tipo, responsável ou descrição de um elemento existente. Campos vazios não mudam."""
-        return m().atualizar_elemento(id, nome, tipo, responsavel, descricao)
+        """Altera nome, tipo, responsável, descrição, sistema ou operação de um elemento existente. Campos vazios não mudam."""
+        return m().atualizar_elemento(id, nome, tipo, responsavel, descricao, sistema, operacao)
 
     @tool
     def remover_elemento(
@@ -164,4 +184,5 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         adicionar_elemento, atualizar_elemento, remover_elemento, mover_elemento,
         conectar, desconectar, rotular_conexao, adicionar_regra, remover_regra,
         anotar_pendencia, resolver_pendencia, desfazer, recomecar_diagrama, pedir_confirmacao,
+        cadastrar_sistema, remover_sistema,
     ]

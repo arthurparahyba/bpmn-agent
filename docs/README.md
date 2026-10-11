@@ -59,7 +59,7 @@ src/bpmn_agent/
     persistencia.py          gravar e ler arquivos
     agente/                  a parte que usa a LLM
       grafo.py               o laço "chama a LLM / executa as tools"
-      ferramentas.py         as 18 tools
+      ferramentas.py         as 20 tools
       prompt.py              instruções do entrevistador
       llm.py                 conexão com o provedor
     dominio/                 o processo e suas regras (sem LLM, sem tela, sem disco)

@@ -8,7 +8,7 @@ Guarda o processo que está sendo desenhado e é o **único lugar** que pode alt
 
 ## Responsabilidade
 
-- Guardar elementos, conexões, participantes, regras e pendências.
+- Guardar elementos, conexões, participantes, sistemas, regras e pendências.
 - Oferecer as operações de edição (adicionar, alterar, remover, mover, conectar...).
 - Recusar operações inválidas com uma mensagem que ensina a corrigir.
 - Permitir desfazer.
@@ -64,6 +64,7 @@ classDiagram
         nome
         descricao
         participantes: lista de nomes
+        sistemas: lista de Sistema
         elementos: id para Elemento
         fluxos: lista de Fluxo
         pendencias: lista de textos
@@ -76,6 +77,14 @@ classDiagram
         responsavel
         descricao
         regras: lista de textos
+        sistema: nome de um Sistema
+        operacao: tela ou chamada
+    }
+    class Sistema {
+        nome
+        descricao
+        integracao
+        operacoes: lista de textos
     }
     class Fluxo {
         id
@@ -86,6 +95,7 @@ classDiagram
     ModeloProcesso --> Processo
     Processo --> "muitos" Elemento
     Processo --> "muitos" Fluxo
+    Processo --> "muitos" Sistema
 ```
 
 - **`Processo`** é o dado puro. **`ModeloProcesso`** é o `Processo` mais a pilha do
@@ -152,7 +162,9 @@ ler e se corrigir, por exemplo:
 | `renomear_participante(atual, novo)` | Troca o nome e atualiza todos os passos dele. |
 | `remover_participante(nome)` | Remove; os passos dele ficam sem responsável. |
 | `adicionar_elemento(...)` | Cria um elemento já ligado ao anterior. Veja abaixo. |
-| `atualizar_elemento(ref, ...)` | Muda nome, tipo, responsável ou descrição. Campo vazio não muda. Responsável `nenhum` tira o responsável. |
+| `atualizar_elemento(ref, ...)` | Muda nome, tipo, responsável, descrição, sistema ou operação. Campo vazio não muda. `nenhum` tira o responsável ou o sistema. |
+| `cadastrar_sistema(nome, ...)` | Cadastra um sistema ou completa um existente (sem duplicar, ignorando acento e maiúsculas). |
+| `remover_sistema(nome)` | Tira do catálogo e limpa o sistema dos passos que o usavam. |
 | `remover_elemento(ref, reconectar)` | Remove e, se der, liga quem vinha antes a quem vinha depois. |
 | `mover_elemento(ref, depois_de)` | Tira do lugar (fechando o buraco) e insere depois de outro. Não move decisões. |
 | `conectar(origem, destino, rotulo)` | Liga dois elementos existentes. Usada para voltas e para juntar caminhos. |
@@ -219,9 +231,24 @@ para decidir o que perguntar. O que é verificado:
 | Decisão com caminhos sem rótulo | "...: caminhos sem resposta/condição indicada." |
 | Passo comum com várias saídas | "... tem várias saídas sem uma decisão." |
 | Passo sem responsável, havendo participantes | "... está sem responsável." |
+| Passo automático sem sistema | "... é automático, mas não sabemos em qual sistema." |
+| Sistema cadastrado que nenhum passo usa | "O sistema '...' está cadastrado, mas nenhum passo o usa." |
 
 Início, fim, decisão, paralelo e espera **não** são cobrados por responsável: não são
 trabalho de alguém.
+
+## Sistemas
+
+`Processo.sistemas` é um catálogo. Um passo aponta para um sistema por nome (`Elemento.sistema`) e
+pode dizer a tela ou chamada usada (`Elemento.operacao`, ex.: `POST /liberacoes`); a operação também é
+aprendida pelo sistema. Regras do modelo:
+
+- Citar um sistema novo num passo o cadastra sozinho; o nome canônico é o já cadastrado (sem
+  acento/maiúsculas), então não nascem variações.
+- **Sistema e participante não se misturam**: o nome de um sistema não pode ser `responsavel` nem
+  participante, e o de um participante não pode virar sistema. O erro explica o caminho certo à LLM.
+- Aparecem no `resumo()` (seção "Sistemas"), na `narrativa()` e na documentação de cada passo no `.bpmn`
+  (`Sistema: X — operação`). Arquivos `processo.json` antigos, sem esses campos, continuam abrindo.
 
 ## Em que raia cada coisa aparece: `raia_de(id)` (em `analise.py`)
 

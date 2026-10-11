@@ -40,6 +40,12 @@ def problemas(m: ModeloProcesso) -> list[str]:
             msgs.append(f"{e.id} '{e.nome}' tem várias saídas sem uma decisão; pode faltar uma decisão.")
         if e.tipo not in HERDAM_RAIA and not e.responsavel and m.p.participantes:
             msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
+        if e.tipo == "serviceTask" and not e.sistema:
+            msgs.append(f"{e.id} '{e.nome}' é automático, mas não sabemos em qual sistema.")
+    usados = {e.sistema for e in els.values()}
+    for s in m.p.sistemas:
+        if s.nome not in usados:
+            msgs.append(f"O sistema '{s.nome}' está cadastrado, mas nenhum passo o usa.")
     return msgs
 
 

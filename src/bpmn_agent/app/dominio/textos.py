@@ -24,11 +24,19 @@ def resumo(m: ModeloProcesso) -> str:
     if p.descricao:
         linhas.append(f"Descrição: {p.descricao}")
     linhas.append(f"Participantes: {', '.join(p.participantes) or '(nenhum)'}")
+    if p.sistemas:
+        linhas.append("Sistemas (não são participantes):")
+        for s in p.sistemas:
+            linhas.append(f"- {s.nome}" + (f": {s.descricao}" if s.descricao else "")
+                          + (f" | acesso: {s.integracao}" if s.integracao else "")
+                          + (f" | operações: {'; '.join(s.operacoes)}" if s.operacoes else ""))
     linhas.append("Elementos:")
     for e in p.elementos.values():
         info = f"- {e.id} [{TIPO_AMIGAVEL.get(e.tipo, e.tipo)}] '{e.nome}'"
         if e.responsavel:
             info += f" | quem: {e.responsavel}"
+        if e.sistema:
+            info += f" | sistema: {e.sistema}" + (f" ({e.operacao})" if e.operacao else "")
         if e.descricao:
             info += f" | obs: {e.descricao}"
         for i, r in enumerate(e.regras, 1):
@@ -48,20 +56,24 @@ def resumo(m: ModeloProcesso) -> str:
 
 
 MARCADOR_MUDANCAS = "\n\n🔎 "
-_CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição")
+_CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição", "o sistema", "a operação no sistema")
+
+
+def assinatura(e: Elemento) -> tuple:
+    """Tudo o que o resumo de mudanças compara de um elemento (na ordem de _CAMPOS)."""
+    return (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao, e.sistema, e.operacao)
 
 
 def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: ModeloProcesso, limite: int = 5) -> str:
     """Frase com o que MUDOU DE FATO no desenho num turno, calculada pelo código (não pela LLM).
-    `antes` mapeia id -> (nome, tipo, responsavel, regras, descricao); `fluxos_antes` tem (origem, destino, rotulo)."""
+    `antes` mapeia id -> assinatura(elemento); `fluxos_antes` tem (origem, destino, rotulo)."""
     p = m.p
     novos = [e.nome for i, e in p.elementos.items() if i not in antes]
     removidos = [a[0] for i, a in antes.items() if i not in p.elementos]
     mudados = []
     for i, e in p.elementos.items():
-        if i in antes and antes[i] != (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao):
-            campos = [c for c, a, b in zip(_CAMPOS, antes[i], (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao))
-                      if a != b]
+        if i in antes and antes[i] != assinatura(e):
+            campos = [c for c, a, b in zip(_CAMPOS, antes[i], assinatura(e)) if a != b]
             mudados.append(f"{e.nome} ({', '.join(campos)})")
     fluxos_depois = {(f.origem, f.destino, f.rotulo) for f in p.fluxos}
     ligacoes_novas, ligacoes_removidas = len(fluxos_depois - fluxos_antes), len(fluxos_antes - fluxos_depois)
@@ -93,12 +105,18 @@ def narrativa(m: ModeloProcesso) -> str:
         cab.append(p.descricao)
     if p.participantes:
         cab.append("**Participantes:** " + ", ".join(p.participantes))
+    if p.sistemas:
+        cab.append("**Sistemas:**\n" + "\n".join(
+            f"- {s.nome}" + (f": {s.descricao}" if s.descricao else "") + (f" ({s.integracao})" if s.integracao else "")
+            + (f" — operações: {'; '.join(s.operacoes)}" if s.operacoes else "") for s in p.sistemas))
     partes = ["\n\n".join(cab), ""]
     for n, e in enumerate(_ordem_visita(m), 1):
         quem = f" — {e.responsavel}" if e.responsavel else ""
         partes.append(f"{n}. **{e.nome}**{quem} _({ROTULO_LEGIVEL.get(e.tipo, e.tipo)})_")
         if e.descricao:
             partes.append(f"   - {e.descricao}")
+        if e.sistema:
+            partes.append(f"   - Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao else ""))
         for r in e.regras:
             partes.append(f"   - Regra: {r}")
         for f in m.saidas(e.id):

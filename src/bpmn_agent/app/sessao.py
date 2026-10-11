@@ -19,7 +19,7 @@ from bpmn_agent.app.agente.grafo import LIMITE_PASSOS_GRAFO, construir_grafo, te
 from bpmn_agent.app.agente.prompt import SAUDACAO
 from bpmn_agent.app.dominio import ModeloProcesso
 from bpmn_agent.app.dominio.processo import _normalizar
-from bpmn_agent.app.dominio.textos import MARCADOR_MUDANCAS, resumo_mudancas
+from bpmn_agent.app.dominio.textos import MARCADOR_MUDANCAS, assinatura, resumo_mudancas
 from bpmn_agent.app.exportacao.exportar_bpmn import gerar_bpmn_xml
 from bpmn_agent.app.persistencia import salvar_artefatos
 
@@ -87,8 +87,7 @@ class Sessao:
             self.pedido_liberado = ""
 
     def _enviar(self, texto_usuario: str) -> RespostaTurno:
-        antes = {i: (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao)
-                 for i, e in self.modelo.p.elementos.items()}
+        antes = {i: assinatura(e) for i, e in self.modelo.p.elementos.items()}
         fluxos_antes = {(f.origem, f.destino, f.rotulo) for f in self.modelo.p.fluxos}
         n_antes = len(self.mensagens())
 
@@ -104,7 +103,7 @@ class Sessao:
 
         depois = self.modelo.p.elementos
         alterados = [i for i, e in depois.items()
-                     if antes.get(i) != (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao)]
+                     if antes.get(i) != assinatura(e)]
         for f in self.modelo.p.fluxos:  # pontas de conexões novas/alteradas também
             if (f.origem, f.destino, f.rotulo) not in fluxos_antes:
                 alterados += [f.id]
