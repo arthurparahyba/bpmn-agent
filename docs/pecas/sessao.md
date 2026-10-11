@@ -68,6 +68,16 @@ flowchart TB
 
 O passo 2 é onde tudo acontece; o detalhe está em [grafo.md](grafo.md).
 
+### Conferência do que mudou de fato
+
+Se o turno chamou alguma tool, a `Sessao` compara o processo com a "foto" do início do turno
+(`resumo_mudancas`) e **anexa a frase ao fim da fala do agente**, depois de um marcador (`🔎`). A fala
+anexada vai para o histórico, então a tela a mostra sem mudar a API. Isso existe porque a LLM pode
+dizer "detalhei a cotação em paralelo" tendo só reescrito uma descrição: o resumo mostra o que
+realmente mudou (ex.: `alterado(s): ... (a descrição)` sem nenhum item novo). Turnos sem tools (só
+conversa) não ganham o resumo. Antes de cada chamada, `grafo.py` remove esse trecho das falas que
+vão para a LLM (`sem_resumo_de_mudancas`), para ela não passar a imitá-lo.
+
 ### Pedido em dúvida (`pendente`)
 
 Quando a LLM acha que um pedido não combina com o desenho, ela chama a tool `pedir_confirmacao`

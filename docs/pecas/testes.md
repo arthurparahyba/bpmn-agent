@@ -72,6 +72,10 @@ tudo o que recebeu, o que permite conferir o que o nó `agente` enviou.
 | `test_cancelar_descarta_sem_chamar_o_llm` | "não" descarta a pendência sem chamar a LLM. |
 | `test_outra_mensagem_descarta_a_pendencia_e_vira_pedido_novo` | Qualquer outra resposta descarta a pendência e segue como pedido novo. |
 | `test_nao_pede_confirmacao_de_novo_depois_de_confirmado` | No turno da confirmação, `pedir_confirmacao` é recusada. |
+| `test_resumo_mostra_que_so_a_descricao_mudou_mesmo_se_a_llm_diz_que_detalhou` | A fala ganha "O que mudou de fato" mostrando só a descrição alterada, e a tela (histórico) a exibe. |
+| `test_resumo_lista_itens_novos_e_ligacoes` | O resumo cita os itens novos e a contagem de ligações. |
+| `test_turno_sem_ferramentas_nao_ganha_resumo_e_a_llm_nao_ve_o_resumo` | Turno só de conversa não tem resumo, e a LLM não recebe o resumo de turnos anteriores. |
+| `test_pedido_em_duvida_mostra_que_nada_mudou` | Ao segurar um pedido, o resumo diz `nada`. |
 | `test_cortar_historico_comeca_em_mensagem_do_usuario` | O corte do histórico sempre começa em uma mensagem do usuário. |
 
 ## Como escrever um teste novo do agente

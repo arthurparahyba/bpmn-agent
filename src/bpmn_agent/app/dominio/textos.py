@@ -47,6 +47,41 @@ def resumo(m: ModeloProcesso) -> str:
     return "\n".join(linhas)
 
 
+MARCADOR_MUDANCAS = "\n\n🔎 "
+_CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição")
+
+
+def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: ModeloProcesso, limite: int = 5) -> str:
+    """Frase com o que MUDOU DE FATO no desenho num turno, calculada pelo código (não pela LLM).
+    `antes` mapeia id -> (nome, tipo, responsavel, regras, descricao); `fluxos_antes` tem (origem, destino, rotulo)."""
+    p = m.p
+    novos = [e.nome for i, e in p.elementos.items() if i not in antes]
+    removidos = [a[0] for i, a in antes.items() if i not in p.elementos]
+    mudados = []
+    for i, e in p.elementos.items():
+        if i in antes and antes[i] != (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao):
+            campos = [c for c, a, b in zip(_CAMPOS, antes[i], (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao))
+                      if a != b]
+            mudados.append(f"{e.nome} ({', '.join(campos)})")
+    fluxos_depois = {(f.origem, f.destino, f.rotulo) for f in p.fluxos}
+    ligacoes_novas, ligacoes_removidas = len(fluxos_depois - fluxos_antes), len(fluxos_antes - fluxos_depois)
+
+    def lista(itens: list[str]) -> str:
+        extra = f" e mais {len(itens) - limite}" if len(itens) > limite else ""
+        return ", ".join(itens[:limite]) + extra
+
+    partes = []
+    if novos:
+        partes.append(f"{len(novos)} item(ns) novo(s): {lista(novos)}")
+    if removidos:
+        partes.append(f"{len(removidos)} removido(s): {lista(removidos)}")
+    if mudados:
+        partes.append(f"alterado(s): {lista(mudados)}")
+    if ligacoes_novas or ligacoes_removidas:
+        partes.append(f"ligações: +{ligacoes_novas} / -{ligacoes_removidas}")
+    return "O que mudou de fato no desenho: " + ("; ".join(partes) if partes else "nada") + "."
+
+
 def narrativa(m: ModeloProcesso) -> str:
     """Descrição do fluxo em linguagem natural (para revisão com o usuário / documentação)."""
     p = m.p

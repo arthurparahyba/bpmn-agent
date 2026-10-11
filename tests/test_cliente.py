@@ -23,7 +23,7 @@ def test_roteiro_completo_pelo_cliente(tmp_path):
     estado = c.criar_sessao()
     assert estado["vazio"]
     resposta = c.enviar(estado["id"], "o primeiro passo é A")
-    assert resposta["texto"] == "Pronto. E depois?" and "Passo_1" in resposta["alterados"]
+    assert resposta["texto"].startswith("Pronto. E depois?") and "Passo_1" in resposta["alterados"]
 
     estado = c.estado(estado["id"])
     assert "Passo_1" in estado["processo"]["elementos"]

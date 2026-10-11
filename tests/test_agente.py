@@ -42,7 +42,7 @@ def test_turno_com_ferramentas_atualiza_diagrama(tmp_path):
     s = Sessao(llm, pasta=tmp_path)
     r = s.enviar("Quero documentar o processo de compras. Começa com a solicitação.")
 
-    assert r.texto == "Entendi! E se o valor for alto, o que acontece?"
+    assert r.texto.startswith("Entendi! E se o valor for alto, o que acontece?")
     assert s.modelo.p.nome == "Compras"
     assert {"Inicio_1", "Passo_1", "Decisao_1"} <= set(s.modelo.p.elementos)
     assert any(a.startswith("conectar: ERRO") for a in r.acoes)
@@ -114,7 +114,7 @@ def test_confirmar_aplica_o_pedido_guardado(tmp_path):
 
     assert s.pendente is None and s.pedido_liberado == ""
     assert s.modelo.p.elementos["Passo_1"].nome == "Aprovar e pagar imposto"
-    assert r.texto == "Feito."
+    assert r.texto.startswith("Feito.")
     # o prompt do turno da confirmação carrega o pedido original; os outros turnos não
     assert "o advogado aprova o pagamento" in llm.vistos[-2][0].content
     assert "Confirmação recebida" not in llm.vistos[0][0].content
@@ -147,6 +147,45 @@ def test_nao_pede_confirmacao_de_novo_depois_de_confirmado(tmp_path):
 
     assert s.pendente is None
     assert any(a.startswith("pedir_confirmacao: ERRO") for a in r.acoes)
+
+
+def test_resumo_mostra_que_so_a_descricao_mudou_mesmo_se_a_llm_diz_que_detalhou(tmp_path):
+    so_descricao = AIMessage(content="", tool_calls=[chamada("atualizar_elemento", {
+        "id": "Passo_1", "descricao": "cada fornecedor envia a sua proposta"}, 40)])
+    s, _ = _sessao_com_passo(tmp_path, so_descricao, AIMessage(content="Pronto, detalhei a cotação em paralelo."))
+    r = s.enviar("detalha a cotação em paralelo")
+
+    assert r.texto.startswith("Pronto, detalhei a cotação em paralelo.")
+    assert "O que mudou de fato no desenho: alterado(s): Pagar imposto (a descrição)." in r.texto
+    assert "novo(s)" not in r.texto and "ligações" not in r.texto
+    assert any("O que mudou de fato" in t for p, t in s.historico_visivel() if p == "assistant")   # a tela mostra
+
+
+def test_resumo_lista_itens_novos_e_ligacoes(tmp_path):
+    novo = AIMessage(content="", tool_calls=[
+        chamada("adicionar_elemento", {"tipo": "tarefa", "nome": "Revisar", "depois_de": "Passo_1"}, 41)])
+    s, _ = _sessao_com_passo(tmp_path, novo, AIMessage(content="Coloquei."))
+    r = s.enviar("coloca revisar depois")
+
+    assert "1 item(ns) novo(s): Revisar" in r.texto and "ligações: +1 / -0" in r.texto
+
+
+def test_turno_sem_ferramentas_nao_ganha_resumo_e_a_llm_nao_ve_o_resumo(tmp_path):
+    novo = AIMessage(content="", tool_calls=[chamada("adicionar_elemento", {"tipo": "tarefa", "nome": "Revisar"}, 42)])
+    s, llm = _sessao_com_passo(tmp_path, novo, AIMessage(content="Coloquei."), AIMessage(content="Só uma conversa."))
+    s.enviar("coloca revisar")
+    r = s.enviar("obrigado")
+
+    assert r.texto == "Só uma conversa." and "O que mudou" not in r.texto
+    enviado = " ".join(str(m.content) for m in llm.vistos[-1])
+    assert "Coloquei." in enviado and "O que mudou de fato" not in enviado     # a LLM não vê o resumo
+
+
+def test_pedido_em_duvida_mostra_que_nada_mudou(tmp_path):
+    s, _ = _sessao_com_passo(tmp_path, DUVIDA, PERGUNTA)
+    r = s.enviar("quem aprova o pagamento é o advogado")
+
+    assert "O que mudou de fato no desenho: nada." in r.texto
 
 
 def test_cortar_historico_comeca_em_mensagem_do_usuario():

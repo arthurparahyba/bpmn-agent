@@ -9,7 +9,7 @@ Faz a LLM e as tools trabalharem em laço até sair uma resposta em texto.
 ## Responsabilidade
 
 - Montar o grafo do LangGraph com dois nós (`construir_grafo`).
-- Cortar o histórico que vai para a LLM (`cortar_historico`).
+- Cortar o histórico que vai para a LLM (`cortar_historico`) e tirar dele o resumo "O que mudou de fato" (`sem_resumo_de_mudancas`).
 - Extrair o texto de uma mensagem (`texto_de`).
 
 Não contém regras de processo (isso é do [domínio](modelo.md)), nem texto de instruções

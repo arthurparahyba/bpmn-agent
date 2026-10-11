@@ -40,7 +40,7 @@ flowchart TB
 | `processo.py` | As estruturas de dados (`Processo`, `Elemento`, `Fluxo`), a tabela de tipos e o `ErroModelo`. Nenhuma operação. |
 | `modelo.py` | A classe `ModeloProcesso`: todas as operações de edição, o desfazer e a conversão de/para dicionário. |
 | `analise.py` | Funções que avaliam o processo sem alterá-lo: `problemas` e `raia_de`. |
-| `textos.py` | Funções que descrevem o processo sem alterá-lo: `resumo` e `narrativa`. |
+| `textos.py` | Funções que descrevem o processo sem alterá-lo: `resumo`, `narrativa` e `resumo_mudancas`. |
 
 Quem usa o domínio importa de `bpmn_agent.app.dominio` e chama tudo pela classe:
 `modelo.problemas()`, `modelo.resumo()` etc. Esses métodos são atalhos de uma linha para
@@ -234,6 +234,12 @@ Exemplo: a decisão "Pedido aprovado?" vem logo depois de "Analisar pedido" (Ges
 
 Um passo comum sem responsável não herda nada: vai para a raia "(sem responsável)" e
 aparece como ponto em aberto, porque aí falta mesmo uma informação.
+
+## `resumo_mudancas` (em `textos.py`)
+
+Compara uma "foto" do processo tirada antes do turno com o processo depois e devolve uma frase como
+`O que mudou de fato no desenho: 3 item(ns) novo(s): ...; alterado(s): Pagar imposto (a descrição); ligações: +2 / -0.`
+Sem mudança, diz `nada`. É calculada pelo código, sem a LLM. Quem a usa é a `Sessao` (ver [sessao.md](sessao.md)).
 
 ## Duas descrições em texto (em `textos.py`)
 

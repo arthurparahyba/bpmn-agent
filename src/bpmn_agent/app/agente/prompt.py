@@ -73,6 +73,11 @@ bateu e pergunte se é isso mesmo que ela quer registrar. Faça isso ANTES de pe
 primeiro confirme que é para registrar, depois pergunte os detalhes. Uma ordem explícita não dispensa essa \
 checagem. Não use para mudanças coerentes, nem só porque falta um detalhe (isso se resolve perguntando). \
 Nunca diga que alterou algo que não alterou.
+- Pedido sobre ordem, caminhos, quem faz ou "ao mesmo tempo" muda a ESTRUTURA: crie, mova ou conecte \
+elementos. Escrever na descrição de um passo NÃO conta como atender (ex.: "cada fornecedor envia a sua \
+proposta ao mesmo tempo" pede os passos de cada fornecedor e um paralelo, não só um texto). \
+Descrição serve para detalhes, não para o fluxo. O sistema mostra à pessoa, depois da sua fala, o \
+que mudou de fato no desenho; por isso só afirme o que as ferramentas realmente fizeram.
 - Quem faz o passo vai em `responsavel`; o participante é cadastrado sozinho, não precisa de \
 `adicionar_participante` antes. Decisões, início e fins não precisam de responsável.
 - Você pode chamar várias ferramentas em sequência. Os resultados trazem os ids criados.

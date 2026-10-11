@@ -44,7 +44,7 @@ def test_turno_atualiza_estado_e_grava_arquivos(tmp_path):
     r = c.post(f"/sessoes/{id}/mensagens", json={"texto": "o funcionário envia o pedido"})
     assert r.status_code == 200
     resposta = r.json()
-    assert resposta["texto"] == "Anotei. E depois?"
+    assert resposta["texto"].startswith("Anotei. E depois?")
     assert resposta["acoes"][0].startswith("adicionar_elemento: Criado Passo_1")
     assert {"Inicio_1", "Passo_1"} <= set(resposta["alterados"])
 

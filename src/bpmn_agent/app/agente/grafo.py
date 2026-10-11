@@ -15,13 +15,14 @@ Agente em LangGraph.
 from __future__ import annotations
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from bpmn_agent.app.agente.ferramentas import criar_ferramentas
 from bpmn_agent.app.agente.prompt import CONFIRMACAO_RECEBIDA, SYSTEM_PROMPT
 from bpmn_agent.app.dominio import ErroModelo
+from bpmn_agent.app.dominio.textos import MARCADOR_MUDANCAS
 
 MAX_TURNOS_HISTORICO = 14   # turnos do usuário mantidos no contexto (o diagrama vai sempre inteiro)
 LIMITE_PASSOS_GRAFO = 60    # proteção contra loops de ferramentas
@@ -39,6 +40,17 @@ def texto_de(msg: AnyMessage) -> str:
         elif isinstance(b, dict) and b.get("type") == "text":
             partes.append(b.get("text", ""))
     return "".join(partes)
+
+
+def sem_resumo_de_mudancas(msgs: list[AnyMessage]) -> list[AnyMessage]:
+    """Tira das falas do agente o resumo 'O que mudou de fato' que o código anexou: é para a pessoa,
+    e a LLM não deve vê-lo (senão passa a imitá-lo em vez de conferir o diagrama)."""
+    saida = []
+    for m in msgs:
+        if isinstance(m, AIMessage) and isinstance(m.content, str) and MARCADOR_MUDANCAS in m.content:
+            m = m.model_copy(update={"content": m.content.split(MARCADOR_MUDANCAS)[0]})
+        saida.append(m)
+    return saida
 
 
 def cortar_historico(msgs: list[AnyMessage], max_turnos: int = MAX_TURNOS_HISTORICO) -> list[AnyMessage]:
@@ -60,7 +72,7 @@ def construir_grafo(llm: BaseChatModel, sessao, checkpointer=None):
         if sessao.pedido_liberado:
             texto_sistema += CONFIRMACAO_RECEBIDA.format(pedido=sessao.pedido_liberado)
         sistema = SystemMessage(texto_sistema)
-        historico = cortar_historico(state["messages"])
+        historico = cortar_historico(sem_resumo_de_mudancas(state["messages"]))
         if historico and not isinstance(historico[0], HumanMessage):
             # alguns provedores (Anthropic, Gemini) exigem que a conversa comece pelo usuário
             historico = [HumanMessage(content="(início da conversa)"), *historico]
