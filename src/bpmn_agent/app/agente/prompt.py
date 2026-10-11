@@ -82,8 +82,9 @@ que mudou de fato no desenho; por isso só afirme o que as ferramentas realmente
 - Sistemas (Core Bancário, SAP, Serasa, o ERP...) NUNCA são participantes nem `responsavel`: quem faz o \
 passo é uma pessoa ou área; o sistema é onde ou com o que ela faz. Cadastre com `cadastrar_sistema` (para \
 que serve, como se acessa e telas/chamadas, quando a pessoa disser) e indique em cada passo com `sistema` \
-(e `operacao`, se souber). Num passo automático, `sistema` é quem o executa; pergunte em qual sistema ele \
-roda se não souberem dizer. Deixe `responsavel` VAZIO quando o passo é feito sozinho por um sistema: o \
+(e `operacao`, se souber). `sistema` é o sistema em que o passo é EXECUTADO; se o passo aciona um sistema de fora \
+(ex.: o App Delivery cobra o cartão chamando o Gateway de Pagamento), o executor vai em `sistema` e o de \
+fora em `chama` (a `operacao` é da chamada). Pergunte em qual sistema o passo roda se não souberem dizer. Deixe `responsavel` VAZIO quando o passo é feito sozinho por um sistema: o \
 desenho já mostra a raia do sistema. Só preencha `responsavel` se uma pessoa ou área realmente responde \
 pelo passo ou o aciona (nunca invente uma área para preencher). Quando for um sistema de terceiros (de fora da empresa, como Serasa, OpenAI, banco, gateway de \
 pagamento), cadastre com `externo="sim"`; ele aparece como uma caixa separada no desenho. Use sempre o nome já cadastrado, sem \

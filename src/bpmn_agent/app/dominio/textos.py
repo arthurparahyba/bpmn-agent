@@ -38,7 +38,9 @@ def resumo(m: ModeloProcesso) -> str:
         if e.responsavel:
             info += f" | quem: {e.responsavel}"
         if e.sistema:
-            info += f" | sistema: {e.sistema}" + (f" ({e.operacao})" if e.operacao else "")
+            info += f" | sistema: {e.sistema}" + (f" ({e.operacao})" if e.operacao and not e.chama else "")
+        if e.chama:
+            info += f" | chama: {e.chama}" + (f" ({e.operacao})" if e.operacao else "")
         if e.descricao:
             info += f" | obs: {e.descricao}"
         for i, r in enumerate(e.regras, 1):
@@ -60,18 +62,21 @@ def resumo(m: ModeloProcesso) -> str:
 MARCADOR_MUDANCAS = "\n\n🔎 "
 MARCADOR_ABERTOS = "\n\n⚠️ "
 MIN_ELEMENTOS_PARA_AVISAR = 3
-_CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição", "o sistema", "a operação no sistema")
+# Perguntas que só pedem o "ok" final ("está correto?"): contam como encerramento, não como pergunta de conteúdo.
+_FECHAMENTO = re.compile(r"esta(?:ria)? (?:tudo )?(?:correto|certo)|ficou (?:certo|correto)|quer (?:mudar|alterar|ajustar)"
+                         r"|mais alguma (?:alteracao|mudanca|coisa|duvida)|deseja (?:mudar|alterar|ajustar)")
+_CAMPOS = ("o nome", "o tipo", "quem faz", "as regras", "a descrição", "o sistema", "a operação no sistema", "o sistema chamado")
 
 
 def assinatura(e: Elemento) -> tuple:
     """Tudo o que o resumo de mudanças compara de um elemento (na ordem de _CAMPOS)."""
-    return (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao, e.sistema, e.operacao)
+    return (e.nome, e.tipo, e.responsavel, tuple(e.regras), e.descricao, e.sistema, e.operacao, e.chama)
 
 
 def aviso_de_conclusao(m: ModeloProcesso, fala: str, limite: int = 5) -> str:
     """Calculado pelo código: se a fala do agente NÃO faz pergunta (está encerrando) e o diagrama ainda tem
     pontos em aberto, devolve o aviso para a pessoa; senão, texto vazio. Os ids saem (são internos)."""
-    if "?" in fala or len(m.p.elementos) < MIN_ELEMENTOS_PARA_AVISAR:
+    if ("?" in fala and not _FECHAMENTO.search(_normalizar(fala))) or len(m.p.elementos) < MIN_ELEMENTOS_PARA_AVISAR:
         return ""
     abertos = [re.sub(r"\b(?:Passo|Decisao|Fim|Inicio|Espera|Paralelo)_\d+ ", "", x).rstrip(".") for x in m.problemas()]
     if not abertos:
@@ -123,9 +128,10 @@ def resumo_mudancas(antes: dict[str, tuple], fluxos_antes: set[tuple], m: Modelo
     if texto_usuario is not None:
         deduzidos = []
         for i, e in p.elementos.items():
-            if e.sistema and (i not in antes or antes[i][5] != e.sistema):
-                if not _citado([e.sistema, e.operacao], texto_usuario):
-                    deduzidos.append(f"{e.sistema} em {e.nome}")
+            for nome_sis, posicao in ((e.sistema, 5), (e.chama, 7)):
+                if nome_sis and (i not in antes or antes[i][posicao] != nome_sis):
+                    if not _citado([nome_sis, e.operacao], texto_usuario):
+                        deduzidos.append(f"{nome_sis} em {e.nome}")
         if deduzidos:
             partes.append("sistema deduzido, não dito por você (confirme): " + lista(deduzidos))
     return "O que mudou de fato no desenho: " + ("; ".join(partes) if partes else "nada") + "."
@@ -153,7 +159,9 @@ def narrativa(m: ModeloProcesso) -> str:
         if e.descricao:
             partes.append(f"   - {e.descricao}")
         if e.sistema:
-            partes.append(f"   - Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao else ""))
+            partes.append(f"   - Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao and not e.chama else ""))
+        if e.chama:
+            partes.append(f"   - Chama: {e.chama}" + (f" — {e.operacao}" if e.operacao else ""))
         for r in e.regras:
             partes.append(f"   - Regra: {r}")
         for f in m.saidas(e.id):

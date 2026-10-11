@@ -210,6 +210,8 @@ class ModeloProcesso:
         for e in self.p.elementos.values():
             if e.sistema == antigo:
                 e.sistema = s.nome
+            if e.chama == antigo:
+                e.chama = s.nome
         return f"Sistema '{antigo}' renomeado para '{s.nome}' (e em todos os passos dele)."
 
     def remover_sistema(self, nome: str) -> str:
@@ -218,8 +220,10 @@ class ModeloProcesso:
             raise ErroModelo(f"Sistema '{nome}' não existe. Existentes: {[x.nome for x in self.p.sistemas]}")
         self._snapshot()
         self.p.sistemas.remove(s)
-        afetados = [e.nome for e in self.p.elementos.values() if e.sistema == s.nome]
+        afetados = [e.nome for e in self.p.elementos.values() if s.nome in (e.sistema, e.chama)]
         for e in self.p.elementos.values():
+            if e.chama == s.nome:
+                e.chama = ""
             if e.sistema == s.nome:
                 e.sistema = e.operacao = ""
         extra = f" Passos que ficaram sem sistema: {afetados}." if afetados else ""
@@ -236,6 +240,7 @@ class ModeloProcesso:
         descricao: str = "",
         sistema: str = "",
         operacao: str = "",
+        chama: str = "",
     ) -> str:
         """
         Cria um elemento. Se `depois_de` for informado:
@@ -270,9 +275,12 @@ class ModeloProcesso:
             responsavel=self._resolver_participante(responsavel),
             descricao=descricao.strip(),
             sistema=self._resolver_sistema(sistema),
-            operacao=operacao.strip() if sistema.strip() else "",
+            chama=self._resolver_sistema(chama),
+            operacao=operacao.strip() if (sistema.strip() or chama.strip()) else "",
         )
-        self._guardar_operacao(novo.sistema, novo.operacao)
+        if novo.chama == novo.sistema:
+            novo.chama = ""
+        self._guardar_operacao(novo.chama or novo.sistema, novo.operacao)
         self.p.elementos[novo.id] = novo
 
         if anterior:
@@ -293,11 +301,11 @@ class ModeloProcesso:
 
     def atualizar_elemento(self, ref: str, nome: str = "", tipo: str = "",
                            responsavel: str = "", descricao: str = "",
-                           sistema: str = "", operacao: str = "") -> str:
+                           sistema: str = "", operacao: str = "", chama: str = "") -> str:
         e = self.resolver(ref)
         novo_tipo = self._tipo_bpmn(tipo) if tipo else None
-        if operacao and not (sistema or e.sistema):
-            raise ErroModelo("Informe o `sistema` ao indicar a `operacao`.")
+        if operacao and not (sistema or chama or e.sistema or e.chama):
+            raise ErroModelo("Informe o `sistema` (ou `chama`) ao indicar a `operacao`.")
         self._snapshot()
         mudou = []
         if nome:
@@ -315,9 +323,17 @@ class ModeloProcesso:
             else:
                 e.sistema = self._resolver_sistema(sistema)
             mudou.append("sistema")
+        if chama:
+            if _normalizar(chama) in {"nenhum", "-"}:
+                e.chama = ""
+            else:
+                e.chama = self._resolver_sistema(chama)
+                if e.chama == e.sistema:
+                    e.chama = ""
+            mudou.append("sistema chamado")
         if operacao:
             e.operacao = "" if _normalizar(operacao) in {"nenhuma", "nenhum", "-"} else operacao.strip()
-            self._guardar_operacao(e.sistema, e.operacao)
+            self._guardar_operacao(e.chama or e.sistema, e.operacao)
             mudou.append("operação")
         return f"{e.id} atualizado ({', '.join(mudou) or 'nada mudou'})."
 

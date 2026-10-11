@@ -200,3 +200,64 @@ def test_externo_pode_ser_mudado_e_arquivo_antigo_abre_como_interno():
     d = m.para_dict()
     d["sistemas"][0].pop("externo")
     assert ModeloProcesso.de_dict(d).p.sistemas[0].externo is False
+
+
+def _delivery():
+    m = ModeloProcesso()
+    m.adicionar_participante("Cliente")
+    m.cadastrar_sistema("App Delivery")
+    m.cadastrar_sistema("Gateway de Pagamento", externo="sim")
+    m.adicionar_elemento("tarefa_pessoa", "Fazer pedido", "Cliente", sistema="App Delivery")
+    m.adicionar_elemento("tarefa_sistema", "Cobrar cartão", "", depois_de="Fazer pedido",
+                         sistema="App Delivery", chama="Gateway de Pagamento", operacao="POST /cobrancas")
+    return m
+
+
+def test_passo_executado_no_app_chamando_o_gateway_fica_na_raia_do_app_com_seta_para_o_gateway():
+    m = _delivery()
+    e = m.p.elementos["Passo_2"]
+    assert (e.sistema, e.chama, e.operacao) == ("App Delivery", "Gateway de Pagamento", "POST /cobrancas")
+    assert m.raia_de("Passo_2") == "App Delivery"
+    assert not any("sem responsável" in x for x in m.problemas())            # o falso aviso some
+    assert m.p.sistemas[1].operacoes == ["POST /cobrancas"]                    # a operação é do sistema chamado
+    nomes, raiz = _lanes(m)
+    assert nomes == ["Cliente", "App Delivery"]
+    msg = raiz.find(".//bpmn:messageFlow", NS)
+    assert msg.get("sourceRef") == "Passo_2"
+    alvo = [p for p in raiz.findall(".//bpmn:participant", NS) if p.get("id") == msg.get("targetRef")][0]
+    assert alvo.get("name") == "Gateway de Pagamento"
+    assert raiz.find(".//bpmn:serviceTask", NS).get("name") == "Cobrar cartão\n[App Delivery → Gateway de Pagamento]"
+
+
+def test_chama_aparece_no_resumo_e_no_resumo_de_mudancas_e_acompanha_renomear_e_remover():
+    from bpmn_agent.app.dominio.textos import assinatura, resumo_mudancas
+    m = _delivery()
+    assert "sistema: App Delivery | chama: Gateway de Pagamento (POST /cobrancas)" in m.resumo()
+    antes = {i: assinatura(e) for i, e in m.p.elementos.items()}
+    m.atualizar_elemento("Passo_2", chama="nenhum")
+    assert "o sistema chamado" in resumo_mudancas(antes, set(), m)
+    m.atualizar_elemento("Passo_2", chama="Gateway de Pagamento")
+    m.renomear_sistema("Gateway de Pagamento", "Pagar.me")
+    assert m.p.elementos["Passo_2"].chama == "Pagar.me"
+    m.remover_sistema("Pagar.me")
+    assert m.p.elementos["Passo_2"].chama == ""
+
+
+def test_dois_passos_com_a_mesma_chamada_viram_ponto_em_aberto():
+    m = _delivery()
+    m.adicionar_elemento("tarefa_sistema", "Reembolsar", "", depois_de="Cobrar cartão",
+                         sistema="App Delivery", chama="Gateway de Pagamento", operacao="POST /reembolsos")
+    assert not any("mesma chamada" in x for x in m.problemas())
+    m.adicionar_elemento("tarefa_sistema", "Reembolsar por prazo", "", depois_de="Reembolsar",
+                         sistema="App Delivery", chama="Gateway de Pagamento", operacao="post /reembolsos")
+    achados = [x for x in m.problemas() if "mesma chamada" in x]
+    assert len(achados) == 1 and "'Reembolsar' e 'Reembolsar por prazo'" in achados[0]
+
+
+def test_aviso_de_conclusao_tambem_vale_quando_a_fala_so_pergunta_se_esta_correto():
+    from bpmn_agent.app.dominio.textos import aviso_de_conclusao
+    m = ModeloProcesso()
+    m.adicionar_elemento("tarefa", "A")
+    m.adicionar_elemento("tarefa", "B", depois_de="A")
+    assert aviso_de_conclusao(m, "Fechei o fluxo. Está correto ou quer mudar algum passo?") != ""
+    assert aviso_de_conclusao(m, "Quem faz o passo B?") == ""

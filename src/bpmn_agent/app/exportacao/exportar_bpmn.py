@@ -173,7 +173,11 @@ def calcular_layout(m: ModeloProcesso) -> dict:
 
     # 8) sistemas de terceiros: uma caixa (piscina recolhida) para cada um, abaixo do processo, ligada por
     #    seta de mensagem aos passos que o usam
-    externos = [s.nome for s in p.sistemas if s.externo and any(e.sistema == s.nome for e in p.elementos.values())]
+    def alvo(e) -> str:   # o sistema de terceiros que o passo aciona (o `chama`, ou o `sistema` se não houver `chama`)
+        s = next((x for x in p.sistemas if x.nome == (e.chama or e.sistema)), None)
+        return s.nome if s and s.externo else ""
+
+    externos = [s.nome for s in p.sistemas if s.externo and any(alvo(e) == s.nome for e in p.elementos.values())]
     caixas, mensagens = {}, {}
     topo_caixas = pool[1] + pool[3] + 50
     for k, nome in enumerate(externos):
@@ -182,7 +186,7 @@ def calcular_layout(m: ModeloProcesso) -> dict:
     for n, nome in enumerate(externos):
         bx, by, bw, bh = caixas[nome]
         for e in p.elementos.values():
-            if e.sistema != nome:
+            if alvo(e) != nome:
                 continue
             x, y, w, h = pos[e.id]
             tcx = x + w / 2
@@ -232,10 +236,13 @@ def gerar_bpmn_xml(m: ModeloProcesso) -> str:
 
     for e in p.elementos.values():
         # o sistema aparece dentro do próprio passo (2ª linha), para dar para ler no desenho
-        rotulo = e.nome + (f"\n[{e.sistema}]" if e.sistema and e.tipo.endswith("Task") else "")
+        tag = " → ".join(x for x in (e.sistema, e.chama) if x) if not (e.chama and not e.sistema) else f"→ {e.chama}"
+        rotulo = e.nome + (f"\n[{tag}]" if tag and e.tipo.endswith("Task") else "")
         no = ET.SubElement(proc, _q("bpmn", e.tipo), {"id": e.id, "name": rotulo})
         doc = "\n".join(([e.descricao] if e.descricao else [])
-                        + ([f"Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao else "")] if e.sistema else [])
+                        + ([f"Sistema: {e.sistema}" + (f" — {e.operacao}" if e.operacao and not e.chama else "")]
+                           if e.sistema else [])
+                        + ([f"Chama: {e.chama}" + (f" — {e.operacao}" if e.operacao else "")] if e.chama else [])
                         + [f"Regra: {r}" for r in e.regras])
         if doc:
             ET.SubElement(no, _q("bpmn", "documentation")).text = doc

@@ -64,8 +64,8 @@ passo é `responsavel`; o sistema usado é `sistema`.
 
 | Tool | Parâmetros | Para que a LLM usa |
 |---|---|---|
-| `adicionar_elemento` | `tipo`, `nome`, `responsavel`, `depois_de`, `rotulo_conexao`, `descricao`, `sistema`, `operacao` | Criar passo, decisão, espera, início ou fim, já ligado ao anterior. |
-| `atualizar_elemento` | `id`, `nome`, `tipo`, `responsavel`, `descricao`, `sistema`, `operacao` | "Quem faz isso é o financeiro", "muda o nome para...". |
+| `adicionar_elemento` | `tipo`, `nome`, `responsavel`, `depois_de`, `rotulo_conexao`, `descricao`, `sistema`, `operacao`, `chama` | Criar passo, decisão, espera, início ou fim, já ligado ao anterior. |
+| `atualizar_elemento` | `id`, `nome`, `tipo`, `responsavel`, `descricao`, `sistema`, `operacao`, `chama` | "Quem faz isso é o financeiro", "muda o nome para...". |
 | `remover_elemento` | `id`, `reconectar` | "Tira esse passo." |
 | `mover_elemento` | `id`, `depois_de` | "Isso acontece antes da aprovação." |
 

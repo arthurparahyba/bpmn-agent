@@ -99,10 +99,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         rotulo_conexao: Annotated[str, "Resposta/condição do caminho quando sai de uma decisão, ex.: 'Sim', 'Acima de R$ 1.000'"] = "",
         descricao: Annotated[str, "Detalhes úteis do passo (opcional)"] = "",
         sistema: Annotated[str, "Sistema usado ou chamado neste passo (cadastrado sozinho se for novo)"] = "",
-        operacao: Annotated[str, "Tela ou chamada no sistema, ex.: 'POST /analise-credito' (opcional)"] = "",
+        operacao: Annotated[str, "Tela ou chamada usada, ex.: 'POST /analise-credito' (opcional)"] = "",
+        chama: Annotated[str, "Sistema DE FORA que este passo aciona (ex.: Gateway de Pagamento). `sistema` fica sendo quem executa o passo"] = "",
     ) -> str:
         """Adiciona um passo, decisão, espera, início ou fim ao diagrama, já conectado ao anterior."""
-        return m().adicionar_elemento(tipo, nome, responsavel, depois_de, rotulo_conexao, descricao, sistema, operacao)
+        return m().adicionar_elemento(tipo, nome, responsavel, depois_de, rotulo_conexao, descricao, sistema, operacao, chama)
 
     @tool
     def atualizar_elemento(
@@ -112,10 +113,11 @@ def criar_ferramentas(sessao) -> list[BaseTool]:
         responsavel: Annotated[str, "Novo responsável; 'nenhum' para tirar"] = "",
         descricao: str = "",
         sistema: Annotated[str, "Sistema usado no passo; 'nenhum' para tirar"] = "",
-        operacao: Annotated[str, "Tela ou chamada no sistema; 'nenhuma' para tirar"] = "",
+        operacao: Annotated[str, "Tela ou chamada usada; 'nenhuma' para tirar"] = "",
+        chama: Annotated[str, "Sistema de fora que o passo aciona; 'nenhum' para tirar"] = "",
     ) -> str:
         """Altera nome, tipo, responsável, descrição, sistema ou operação de um elemento existente. Campos vazios não mudam."""
-        return m().atualizar_elemento(id, nome, tipo, responsavel, descricao, sistema, operacao)
+        return m().atualizar_elemento(id, nome, tipo, responsavel, descricao, sistema, operacao, chama)
 
     @tool
     def remover_elemento(

@@ -77,8 +77,9 @@ classDiagram
         responsavel
         descricao
         regras: lista de textos
-        sistema: nome de um Sistema
+        sistema: onde o passo é executado
         operacao: tela ou chamada
+        chama: sistema de fora que ele aciona
     }
     class Sistema {
         nome
@@ -234,12 +235,18 @@ para decidir o que perguntar. O que é verificado:
 | Passo comum com várias saídas | "... tem várias saídas sem uma decisão." |
 | Passo sem responsável, havendo participantes | "... está sem responsável." |
 | Passo automático sem sistema | "... é automático, mas não sabemos em qual sistema." |
+| Dois passos com a mesma chamada, executor e responsável | "'A' e 'B' usam a mesma chamada (...); se for o mesmo passo, junte os dois." |
 | Sistema cadastrado que nenhum passo usa | "O sistema '...' está cadastrado, mas nenhum passo o usa." |
 
 Início, fim, decisão, paralelo e espera **não** são cobrados por responsável: não são
 trabalho de alguém.
 
 ## Sistemas
+
+Cada passo tem dois campos de sistema: `sistema` (onde ele é **executado**, vira a raia quando o sistema é da
+empresa e o passo não tem responsável) e `chama` (o sistema **de fora** que ele aciona, vira a caixa com a seta
+de mensagem). Ex.: "Cobrar cartão" = `sistema` App Delivery, `chama` Gateway de Pagamento, `operacao`
+`POST /cobrancas` (a operação é da chamada). O rótulo no desenho é `[App Delivery → Gateway de Pagamento]`.
 
 `Processo.sistemas` é um catálogo. Um passo aponta para um sistema por nome (`Elemento.sistema`) e
 pode dizer a tela ou chamada usada (`Elemento.operacao`, ex.: `POST /liberacoes`); a operação também é

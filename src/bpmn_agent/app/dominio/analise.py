@@ -40,9 +40,18 @@ def problemas(m: ModeloProcesso) -> list[str]:
             msgs.append(f"{e.id} '{e.nome}' tem várias saídas sem uma decisão; pode faltar uma decisão.")
         if e.tipo not in HERDAM_RAIA and not e.responsavel and not _raia_do_sistema(m, e) and m.p.participantes:
             msgs.append(f"{e.id} '{e.nome}' está sem responsável.")
-        if e.tipo == "serviceTask" and not e.sistema:
+        if e.tipo == "serviceTask" and not e.sistema and not e.chama:
             msgs.append(f"{e.id} '{e.nome}' é automático, mas não sabemos em qual sistema.")
-    usados = {e.sistema for e in els.values()}
+    usados = {e.sistema for e in els.values()} | {e.chama for e in els.values()}
+    vistos: dict[tuple, str] = {}
+    for e in els.values():   # a mesma chamada, do mesmo executor e do mesmo responsável, em dois passos
+        if e.operacao and (e.chama or e.sistema):
+            chave = (e.chama or e.sistema, e.operacao.lower(), e.sistema, e.responsavel)
+            if chave in vistos:
+                msgs.append(f"'{vistos[chave]}' e '{e.nome}' usam a mesma chamada ({e.operacao}); "
+                            "se for o mesmo passo, junte os dois (se forem passos diferentes, pode ignorar).")
+            else:
+                vistos[chave] = e.nome
     for s in m.p.sistemas:
         if s.nome not in usados:
             msgs.append(f"O sistema '{s.nome}' está cadastrado, mas nenhum passo o usa.")

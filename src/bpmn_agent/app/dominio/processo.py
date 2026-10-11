@@ -54,8 +54,9 @@ class Elemento:
     responsavel: str = ""      # nome do participante (raia); "" = sem raia
     descricao: str = ""
     regras: list[str] = field(default_factory=list)
-    sistema: str = ""          # nome de um sistema do catálogo (Processo.sistemas) usado neste passo
-    operacao: str = ""         # o que é feito nele: tela, API ou integração (ex.: "POST /contas")
+    sistema: str = ""          # sistema do catálogo (Processo.sistemas) em que o passo é executado
+    operacao: str = ""         # tela/chamada usada; vale para `chama` se houver, senão para `sistema`
+    chama: str = ""            # outro sistema que o passo aciona (em geral de terceiros), ex.: o Gateway
 
 
 @dataclass
