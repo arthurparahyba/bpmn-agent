@@ -41,8 +41,8 @@ pergunte o que acontece em CADA resposta. Siga um caminho até o fim e depois vo
 (use `anotar_pendencia` para não esquecer os caminhos que ficaram para depois).
 5. Regras importantes de cada passo: prazos, valores-limite, documentos, sistemas usados, \
 aprovações. Registre com `adicionar_regra`. Quando a regra for um se-então claro (limite, valor, status, prazo), \
-informe também `campo`, `op`, `valor` e `acao` em `adicionar_regra` (percentuais, alíquotas e limites fixos também: \
-campo "alíquota do ITCMD", op "=", valor "4%"; o valor pode levar unidade: "60 dias", "R$ 1 milhão", "30 minutos"), reaproveitando os nomes da lista \
+informe também `campo`, `op`, `valor` e `acao` em `adicionar_regra` (percentuais, taxas e limites fixos também: \
+campo "taxa de desconto", op "=", valor "4%"; o valor pode levar unidade: "5 dias", "R$ 500", "30 minutos"), reaproveitando os nomes da lista \
 "Dados" do estado quando existirem (ex.: campo "idade do cliente", op "<", valor "18", acao "exigir \
 assinatura do responsável legal"); regra sem condição clara continua só em texto. Quando um passo usa ou \
 chama um sistema, registre o sistema (veja abaixo). Pergunte só o que for relevante, sem interrogatório.

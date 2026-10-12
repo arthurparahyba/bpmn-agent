@@ -265,7 +265,7 @@ da regra, para um programa ler: `quando idade do cliente < 18 → exigir assinat
 - `op` é um de `= != < <= > >= contem em` (aceita `==`, `≥`, `≤`, `≠`, `<>`).
 - `valor` é separado em número e unidade quando o texto começa por número: `"60 dias"` vira `60` + `dias`;
   `"R$ 1 milhão"` vira `1000000` + `BRL`; `"4%"` vira `4` + `%`. Texto como `"aprovado"` fica texto.
-- Parâmetros fixos (alíquotas, limites) também viram condição: campo `alíquota do ITCMD`, op `=`, valor `4%`.
+- Parâmetros fixos (taxas, limites) também viram condição: campo `taxa de desconto`, op `=`, valor `4%`.
 - `campo` é um **Dado** do catálogo `Processo.dados`: citar um campo novo o cadastra, e o mesmo nome com outra
   grafia (maiúscula, acento) reaproveita o já cadastrado. O catálogo aparece no `resumo()` para a LLM reutilizar
   os nomes. É por jornada: nomes diferentes entre jornadas (ou sinônimos) não são unificados.
