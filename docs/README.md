@@ -2,7 +2,8 @@
 
 Este documento dá a visão geral. Para o detalhe de cada arquivo, veja [pecas/](pecas/).
 Para acompanhar uma conversa real mensagem por mensagem, veja
-[PASSO_A_PASSO.md](../PASSO_A_PASSO.md). Termos técnicos estão no [glossário](glossario.md).
+[PASSO_A_PASSO.md](../PASSO_A_PASSO.md). O que foi acrescentado depois do commit `e0ae5e2` está em
+[EVOLUCAO.md](EVOLUCAO.md). Termos técnicos estão no [glossário](glossario.md).
 
 ## 1. O que a aplicação faz
 
